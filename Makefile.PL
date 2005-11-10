@@ -5,8 +5,8 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'Crypt::X509',
     VERSION_FROM      => 'lib/Crypt/X509.pm', # finds $VERSION
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    PREREQ_PM         => {Convert::ASN1 => 0.19}, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Crypt/X509.pm', # retrieve abstract from module
-       AUTHOR         => 'Mike Jackson <jacksonm@localdomain>') : ()),
+       AUTHOR         => 'Mike Jackson, Alexander Jung') : ()),
 );

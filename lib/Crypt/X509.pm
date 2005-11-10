@@ -1,10 +1,42 @@
 package Crypt::X509;
 
-use strict;
 use Carp;
+use strict;
+use warnings;
 use Convert::ASN1 qw(:io :debug);
 
-our $VERSION = '0.01';
+
+require Exporter;
+
+our @ISA = qw(Exporter);
+our %EXPORT_TAGS = ( 'all' => [qw()] );
+our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
+our @EXPORT = qw(error new not_before not_after serial);
+our $VERSION = '0.2';
+
+my $parser = undef;
+my $asn = undef;
+my $error = undef;
+my %oid2enchash= (	'1.2.840.113549.1.1.1' => {'enc' => 'RSA'},
+					'1.2.840.113549.1.1.2' => {'enc' => 'RSA', 'hash' => 'MD2'},
+					'1.2.840.113549.1.1.3' => {'enc' => 'RSA', 'hash' => 'MD4'},
+					'1.2.840.113549.1.1.4' => {'enc' => 'RSA', 'hash' => 'MD5'},
+					'1.2.840.113549.1.1.5' => {'enc' => 'RSA', 'hash' => 'SHA1'},
+					'1.2.840.113549.1.1.6' => {'enc' => 'OAEP'}
+);
+
+my %oid2attr = (
+                "2.5.4.3" => "CN",
+                "2.5.4.6" => "C",
+                "2.5.4.7" => "l",
+                "2.5.4.8" => "S",
+                "2.5.4.10" => "O",
+                "2.5.4.11" => "OU",
+                "1.2.840.113549.1.9.1" => "E",
+                "0.9.2342.19200300.100.1.1" => "UID",
+                "0.9.2342.19200300.100.1.25" => "DC"
+               );
+               
 
 =head1 NAME
 
@@ -14,11 +46,10 @@ Crypt::X509 - Parses an X.509 certificate
 
  use Crypt::X509;
 
- $cert = Crypt::X509->new( cert => $cert );
+ $decoded = Crypt::X509->new( cert => $cert );
 
- $subject_email	= $cert->subject_email;
-
-=cut
+ $subject_email	= $decoded->subject_email;
+ print "do not use after: ".gmtime($decoded->not_after)." GMT\n";
 
 =head1 REQUIRES
 
@@ -29,70 +60,80 @@ Convert::ASN1
 B<Crypt::X509> parses X.509 certificates. Methods are provided for accessing most
 certificate elements.
 
-=cut
-
-#########################################################################
-# constructor
-#########################################################################
+It is based on the generic ASN.1 module by Graham Barr, on the F<x509decode>
+example by Norbert Klasen and contributions on the perl-ldap-dev-Mailinglist
+by Chriss Ridd.
 
 =head1 CONSTRUCTOR
 
-=over 4
+=head2 new ( OPTIONS )
 
-=item new ( OPTIONS )
-
-Creates and returns a parsed X.509 certificate object.
+Creates and returns a parsed X.509 certificate hash, containing the parsed
+contents. The data is organised as specified in RFC 2459.
+By default only the first ASN.1 Layer is decoded. Nested decoding 
+is done automagically through the data access methods.
 
 =over 4
 
 =item cert =E<gt> $certificate
 
-A variable containing the DER formatted certificate to be parsed.
+A variable containing the DER formatted certificate to be parsed 
+(eg. as stored in C<usercertificate;binary> attribute in an
+LDAP-directory).
+
+=back
+
+=head3 Example:
+
+  use Crypt::X509;
+  use Data::Dumper;
+  
+  $decoded= Crypt::X509->new(cert => $cert);
+  
+  print Dumper($decoded);
 
 =cut back
 
 sub new {
-	my ($class, %args) = @_;
-
-	my $self = _decode($args{'cert'});
-
-	return bless($self, $class);
+	my ($class,%args) = @_;
+	if (!defined ($parser)) {
+		$parser=_init();
+	}
+	my $self = $parser->decode($args{'cert'});
+	
+	$self->{"_error"} = $parser->error;
+	bless ($self, $class);
+	return $self;
 }
-
-
-#########################################################################
-# accessors - general items
-#########################################################################
 
 =head1 METHODS
 
-=over 4
+=head2 error
 
-=item pubkey_algorithm ( )
+Returns the last error from parsing, C<undef> when no error occured. 
+This error is updated on deeper parsing with the data access methods.
 
-Returns the algorithm which the public key was created with.
+=head3 Example:
 
-=cut back
-
-sub pubkey_algorithm {
-	my $self = shift;
-	return $self->{tbsCertificate}{subjectPublicKeyInfo}{algorithm}{algorithm};
-}
-
-
-=item pubkey ( )
-
-Returns the certificate's public key in DER format.
+  $decoded= Crypt::X509->new(cert => $cert);
+  if ($decoded->error) {
+	warn "Error on parsing Certificate:".$decoded->error;
+  }
 
 =cut back
 
-sub pubkey {
+sub error {
 	my $self = shift;
-	return $self->{tbsCertificate}{subjectPublicKeyInfo}{subjectPublicKey}[0];
+	return $self->{"_error"};
 }
 
+=head1 DATA ACCESS METHODS
 
-=item version ( )
+You can access all parsed data directly from the returned hash. For convenience
+the following methods have been implemented to give quick access to the most-used
+certificate attributes.
+
+=head2 version 
 
 Returns the certificate's version.
 
@@ -103,10 +144,15 @@ sub version {
 	return $self->{tbsCertificate}{version};
 }
 
+=head2 serial
 
-=item serial ( )
+returns the serial number (integer or Math::BigInt Object, that gets automagic
+evaluated in scalar context) from the certificate
 
-Returns the certificate's serial number.
+=head3 Example:
+
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Certificate has serial number:".$decoded->serial."\n";
 
 =cut back
 
@@ -115,22 +161,16 @@ sub serial {
 	return $self->{tbsCertificate}{serialNumber};
 }
 
+=head2 not_before
 
-=item sig_algorithm ( )
+returns the GMT-timestamp of the certificate's beginning date of validity.
 
-Returns the certificate's signature algorithm.
+=head3 Example:
 
-=cut back
-
-sub sig_algorithm {
-	my $self = shift;
-	return $self->{tbsCertificate}{signature}{algorithm};
-}
-
-
-=item not_before ( )
-
-Returns the certificate's beginning date of validity.
+  $decoded= Crypt::X509->new(cert => $cert);
+  if ($decoded->notBefore < time()) {
+	warn "Certificate: not yet valid!";
+  }
 
 =cut back
 
@@ -140,9 +180,14 @@ sub not_before {
 }
 
 
-=item not_after ( )
+=head2 not_after
 
-Returns the certificate's ending date of validity.
+returns the GMT-timestamp of the certificate's ending date of validity.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Certificate expires on ".gmtime($decoded->not_after)." GMT\n";
 
 =cut back
 
@@ -151,105 +196,225 @@ sub not_after {
 	return $self->{tbsCertificate}{validity}{notAfter}{utcTime};
 }
 
+=head2 signature
 
-=item signature ( )
-
-Return's the certificate's signature in DER format.
+Return's the certificate's signature in binary DER format.
 
 =cut back
 
 sub signature {
 	my $self = shift;
-	# should base64_encode() before returning?
 	return $self->{signature}[0];
 }
 
+=head2 pubkey
 
-#=item sig_algorithm ( )
-#
-#Return's the certificate's signature algorithm.
-#
-#=cut back
-#
-#sub sig_algorithm {
-#	my $self = shift;
-#	return $self->{signatureAlgorithm}{algorithm};
-#}
+Returns the certificate's public key in binary DER format.
+
+=cut back
+
+sub pubkey {
+	my $self = shift;
+	return $self->{tbsCertificate}{subjectPublicKeyInfo}{subjectPublicKey}[0];
+}
+
+=head2 pubkey_algorithm
+
+Returns the algorithm as OID string which the public key was created with.
+
+=cut back
+
+sub pubkey_algorithm {
+	my $self = shift;
+	return $self->{tbsCertificate}{subjectPublicKeyInfo}{algorithm}{algorithm};
+}
+
+=head2 sig_algorithm
+
+Returns the certificate's signature algorithm as OID string
+
+=head3 Example:
+  
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Certificate signature is encrypted with:".$decoded->sig_algorithm."\n";
+  
+  Example Output: Certificate signature is encrypted with: 1.2.840.113549.1.1.5
+
+=cut back
+
+sub sig_algorithm {
+	my $self = shift;
+	return $self->{tbsCertificate}{signature}{algorithm};
+}
+
+=head2 SigEncAlg
+
+returns the signature encryption algorithm (e.g. 'RSA') as string.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Certificate signature is encrypted with:".$decoded->SigEncAlg."\n";
+  
+  Example Output: Certificate signature is encrypted with: RSA
+  
+
+=cut back
+
+sub SigEncAlg {
+	my $self=shift;
+	return $oid2enchash{$self->{'signatureAlgorithm'}->{'algorithm'}}->{'enc'};
+}
+
+=head2 SigHashAlg
+
+returns the signature hashing algorithm (e.g. 'SHA1') as string.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Certificate signature is hashed with:".$decoded->SigHashAlg."\n";
+
+  Example Output: Certificate signature is encrypted with: SHA1
+
+=cut back
+
+sub SigHashAlg {
+	my $self=shift;
+	return $oid2enchash{$self->{'signatureAlgorithm'}->{'algorithm'}}->{'hash'};
+}
 
 
 #########################################################################
 # accessors - subject
 #########################################################################
 
-=item subject_country ( )
+=head2 Subject
 
-Returns the subject's country.
+returns a pointer to an array of strings containing subject nameparts of the
+certificate. Attributenames for the most common Attributes are translated 
+from the OID-Numbers, unknown numbers are output verbatim.
+
+=head3 Example:
+ 
+  $decoded= Convert::ASN1::X509->new($cert);
+  print "DN for this Certificate is:".join(',',@{$decoded->Subject})."\n";
+
+=cut back
+
+sub Subject {
+	my $self=shift;
+	my ($i,$type);
+	my $subjrdn=$self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
+	$self->{'tbsCertificate'}->{'subject'}->{'dn'}=[];
+	my $subjdn=$self->{'tbsCertificate'}->{'subject'}->{'dn'};
+	foreach my $subj (@{$subjrdn}) {
+		$i=@{$subj}[0];
+		if ($oid2attr{$i->{'type'}}) { 
+			$type = $oid2attr{$i->{'type'}};
+		 } else {
+            $type = $i->{'type'};
+        };
+		my @key= keys (%{$i->{'value'}});
+		push @{$subjdn},$type."=".$i->{'value'}->{$key[0]};
+	}
+	return $subjdn;
+}
+
+sub _subject_part {
+	my $self = shift;
+	my $oid = shift;
+	my $subjrdn=$self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
+	foreach my $subj (@{$subjrdn}) {
+		my $i = @{$subj}[0];
+		if ($i->{'type'} eq $oid) { 
+			my @key= keys (%{$i->{'value'}});
+			return $i->{'value'}->{$key[0]};
+		 }
+	}
+	return undef;
+}
+
+=head2 subject_country 
+
+Returns the string value for subject's country (= the value with the
+ OID 2.5.4.6 or in DN Syntax everything after C<C=>).
+Only the first entry is returned. C<undef> if subject contains no country attribute.
 
 =cut back
 
 sub subject_country {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[0][0]{value}{printableString};
+	return _subject_part($self,'2.5.4.6');
 }
 
 
-=item subject_state ( )
+=head2 subject_state
 
-Returns the subject's state or province.
+Returns the string value for subject's state or province (= the value with the 
+OID 2.5.4.8 or in DN Syntax everything after C<S=>).
+Only the first entry is returned. C<undef> if subject contains no state attribute.
 
 =cut back
 
 sub subject_state {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[1][0]{value}{printableString};
+	return _subject_part($self,'2.5.4.8');
 }
 
+=head2 subject_org
 
-=item subject_org ( )
-
-Returns the subject's organization.
+Returns the string value for subject's organization (= the value with the
+OID 2.5.4.10 or in DN Syntax everything after C<O=>).
+Only the first entry is returned. C<undef> if subject contains no organization attribute.
 
 =cut back
 
 sub subject_org {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[2][0]{value}{printableString};
+	return _subject_part($self,'2.5.4.10');
 }
 
 
-=item subject_ou ( )
+=head2 subject_ou
 
-Returns the subject's organizational unit.
+Returns the string value for subject's organizational unit (= the value with the
+OID 2.5.4.11 or in DN Syntax everything after C<OU=>).
+Only the first entry is returned. C<undef> if subject contains no organization attribute.
 
 =cut back
 
 sub subject_ou {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[3][0]{value}{printableString};
+	return _subject_part($self,'2.5.4.11');
 }
 
 
-=item subject_cn ( )
+=head2 subject_cn 
 
-Returns the subject's common name.
+Returns the string value for subject's common name (= the value with the
+OID 2.5.4.3 or in DN Syntax everything after C<CN=>).
+Only the first entry is returned. C<undef> if subject contains no common name attribute.
 
 =cut back
 
 sub subject_cn {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[4][0]{value}{printableString};
+	return _subject_part($self,'2.5.4.3');
 }
 
 
-=item subject_email ( )
+=head2 subject_email
 
-Returns the subject's email address.
+Returns the string value for subject's email address (= the value with the
+OID 1.2.840.113549.1.9.1 or in DN Syntax everything after C<E=>).
+Only the first entry is returned. C<undef> if subject contains no email attribute.
 
 =cut back
 
 sub subject_email {
 	my $self = shift;
-	return $self->{tbsCertificate}{subject}{rdnSequence}[5][0]{value}{ia5String};
+	return _subject_part($self,'1.2.840.113549.1.9.1');
 }
 
 
@@ -257,93 +422,309 @@ sub subject_email {
 # accessors - issuer
 #########################################################################
 
-=item issuer_cn ( )
+=head2 Issuer
 
-Returns the issuer's common name.
+returns a pointer to an array of strings building the DN of the certificate
+issuer (= the DN of the CA). Attributenames for the most common Attributes
+are translated from the OID-Numbers, unknown numbers are output verbatim.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new($cert);
+  print "Certificate was issued by:".join(',',@{$decoded->Issuer})."\n";
+
+=cut back
+
+
+sub Issuer {
+	my $self=shift;
+	my ($i,$type);
+	my $issuerdn=$self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
+	$self->{'tbsCertificate'}->{'issuer'}->{'dn'}=[];
+	my $issuedn=$self->{'tbsCertificate'}->{'issuer'}->{'dn'};
+	foreach my $issue (@{$issuerdn}) {
+		$i=@{$issue}[0];
+		if ($oid2attr{$i->{'type'}}) { 
+			$type = $oid2attr{$i->{'type'}};
+		 } else {
+            $type = $i->{'type'};
+        };
+		my @key= keys (%{$i->{'value'}});
+		push @{$issuedn},$type."=".$i->{'value'}->{$key[0]};
+	}
+	return $issuedn;
+}
+
+sub _issuer_part {
+	my $self = shift;
+	my $oid = shift;
+	my $issuerrdn=$self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
+	foreach my $issue (@{$issuerrdn}) {
+		my $i = @{$issue}[0];
+		if ($i->{'type'} eq $oid) { 
+			my @key= keys (%{$i->{'value'}});
+			return $i->{'value'}->{$key[0]};
+		 }
+	}
+	return undef;
+}
+
+=head2 issuer_cn 
+
+Returns the string value for issuer's common name (= the value with the
+OID 2.5.4.3 or in DN Syntax everything after C<CN=>).
+Only the first entry is returned. C<undef> if issuer contains no common name attribute.
 
 =cut back
 
 sub issuer_cn {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[0][0]{value}{printableString};
+	return _issuer_part($self,'2.5.4.3');
 }
 
 
-=item issuer_country ( )
+=head2 issuer_country 
 
-Returns the issuer's country.
+Returns the string value for issuer's country (= the value with the
+ OID 2.5.4.6 or in DN Syntax everything after C<C=>).
+Only the first entry is returned. C<undef> if issuer contains no country attribute.
 
 =cut back
 
 sub issuer_country {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[1][0]{value}{printableString};
+	return _issuer_part($self,'2.5.4.6');
 }
 
+=head2 issuer_state
 
-=item issuer_state ( )
-
-Returns the issuer's state or province.
+Returns the string value for issuer's state or province (= the value with the 
+OID 2.5.4.8 or in DN Syntax everything after C<S=>).
+Only the first entry is returned. C<undef> if issuer contains no state attribute.
 
 =cut back
 
 sub issuer_state {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[2][0]{value}{printableString};
+	return _issuer_part($self,'2.5.4.8');
 }
 
+=head2 issuer_locality
 
-=item issuer_locality ( )
-
-Returns the issuer's locality.
+Returns the string value for issuer's locality (= the value with the
+OID 2.5.4.7 or in DN Syntax everything after C<L=>).
+Only the first entry is returned. C<undef> if issuer contains no locality attribute.
 
 =cut back
 
 sub issuer_locality {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[3][0]{value}{printableString};
+	return _issuer_part($self,'2.5.4.7');
 }
 
+=head2 issuer_org
 
-=item issuer_org ( )
-
-Returns the issuer's organization.
+Returns the string value for issuer's organization (= the value with the
+OID 2.5.4.10 or in DN Syntax everything after C<O=>).
+Only the first entry is returned. C<undef> if issuer contains no organization attribute.
 
 =cut back
 
 sub issuer_org {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[4][0]{value}{printableString};
+	return _issuer_part($self,'2.5.4.10');
 }
 
+=head2 issuer_email
 
-=item issuer_email ( )
-
-Returns the issuer's email address.
+Returns the string value for issuer's email address (= the value with the
+OID 1.2.840.113549.1.9.1 or in DN Syntax everything after C<E=>).
+Only the first entry is returned. C<undef> if issuer contains no email attribute.
 
 =cut back
 
 sub issuer_email {
 	my $self = shift;
-	return $self->{tbsCertificate}{issuer}{rdnSequence}[5][0]{value}{ia5String};
+	return _issuer_part($self,'1.2.840.113549.1.9.1');
 }
 
 
 #########################################################################
 # accessors - extensions (automate this)
 #########################################################################
-#sub {
-#	# method - $decode->;
-#	print "extnID [0]: $cert->{tbsCertificate}{extensions}[0]{extnID}\n";
-#}
-#
-#sub {
-#	# method - $decode->;
-#	print "extnID [1]: $cert->{tbsCertificate}{extensions}[1]{extnID}\n";
-#}
+
+=head2 KeyUsage
+
+returns a pointer to an array of strings describing the valid Usages 
+for this certificate. C<undef> is returned, when the extension is not set in the
+certificate.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new(cert => $cert);
+  print "Allowed usages for this Certificate are:\n".join("\n",@{$decoded->KeyUsage})."\n";
+
+  Example Output:
+  Allowed usages for this Certificate are: 
+  digitalSignature
+  keyEncipherment
+  dataEncipherment
+
+=cut back
 
 
-=item authority_serial ( )
+sub KeyUsage {
+    my $self=shift;
+    my $ext;
+    my $exts=$self->{'tbsCertificate'}->{'extensions'};
+    if (!defined $exts) {return undef;}; # no extensions in certificate
+    foreach $ext (@{$exts}) {
+        if ($ext->{'extnID'} eq '2.5.29.15') { #OID for keyusage
+            my $parsKeyU=_init('KeyUsage'); # get a parser for this
+            my $keyusage=$parsKeyU->decode($ext->{'extnValue'}); # decode the value
+            if ($parsKeyU->error) {
+                $self->{"_error"} = $parsKeyU->error;
+                return undef;
+            }
+            my $keyu= unpack("S",${$keyusage}[0].${$keyusage}[1]) & 511 ;
+            $ext->{'usage'}= [];
+            if ($keyu & 128) {push @{$ext->{'usage'}}, "digitalSignature";}
+            if ($keyu & 64) {push @{$ext->{'usage'}}, "nonRepudiation";}
+            if ($keyu & 32) {push @{$ext->{'usage'}}, "keyEncipherment";}
+            if ($keyu & 16) {push @{$ext->{'usage'}}, "dataEncipherment";}
+            if ($keyu & 8) {push @{$ext->{'usage'}}, "keyAgreement";}
+            if ($keyu & 4) {push @{$ext->{'usage'}}, "keyCertSign";}
+            if ($keyu & 2) {push @{$ext->{'usage'}}, "cRLSign";}
+            if ($keyu & 1) {push @{$ext->{'usage'}}, "encipherOnly";}
+            #if ($keyu & 256) {push @{$ext->{'usage'}}, "decipherOnly";}
+
+            return $ext->{'usage'};
+        }
+    }
+    return undef; # keyusage extension not found
+}
+
+=head2 SubjectAltName
+
+returns a pointer to an array of strings containing alternative Subjectnames or
+C<undef> if the extension is not filled. Usually this Extension holds the e-Mail
+address for person-certificates or DNS-Names for server certificates.
+
+  $decoded= Crypt::X509->new($cert);
+  print "E-Mail or Hostnames in this Certificates is/are:".join("\n",@{$decoded->SubjectAltName})."\n";
+
+=cut back
+
+sub SubjectAltName {
+    my $self=shift;
+    my $ext;
+    my $exts=$self->{'tbsCertificate'}->{'extensions'};
+    if (!defined $exts) {return undef;}; # no extensions in certificate
+    foreach $ext (@{$exts}) {
+        if ($ext->{'extnID'} eq '2.5.29.17') { #OID for SubjectAltName
+            my $parsSubjAlt=_init('SubjectAltName'); # get a parser for this
+            my $altnames=$parsSubjAlt->decode($ext->{'extnValue'}); # decode the value
+            if ($parsSubjAlt->error) {
+                $self->{"_error"} = $parsSubjAlt->error;
+                return undef;
+                }
+            $ext->{'names'}= [];
+            foreach my $name (@{$altnames}) {
+                foreach my $value (keys %{$name}) {
+                    push @{$ext->{'names'}}, $name->{$value};
+                    }
+                }
+            return $ext->{'names'};
+        }
+    }
+    return undef;
+}
+
+#########################################################################
+# accessors - authorityCertIssuer
+#########################################################################
+
+sub _AuthorityKeyIdentifier {
+    my $self=shift;
+    my $ext;
+    my $exts=$self->{'tbsCertificate'}->{'extensions'};
+    if (!defined $exts) {return undef;}; # no extensions in certificate
+	if (defined $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'}) {
+		return ($self->{'tbsCertificate'}{'AuthorityKeyIdentifier'});
+	}
+	foreach $ext (@{$exts}) {
+        if ($ext->{'extnID'} eq '2.5.29.35') { #OID for AuthorityKeyIdentifier
+            my $pars=_init('AuthorityKeyIdentifier'); # get a parser for this
+            $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'}=$pars->decode($ext->{'extnValue'}); # decode the value
+            if ($pars->error) {
+                $self->{"_error"} = $pars->error;
+                return undef;
+            }
+            return $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'};
+        }
+    }
+    return undef;
+}
+
+=head2 authorityCertIssuer
+
+returns a pointer to an array of strings building the DN of the Authority Cert
+Issuer. Attributenames for the most common Attributes
+are translated from the OID-Numbers, unknown numbers are output verbatim.
+undef if the extension is not set in the certificate.
+
+=head3 Example:
+
+  $decoded= Crypt::X509->new($cert);
+  print "Certificate was authorised by:".join(',',@{$decoded->authorityCertIssuer})."\n";
+
+=cut back
+
+sub authorityCertIssuer {
+	my $self=shift;
+	my ($i,$type);
+	my $rdn=_AuthorityKeyIdentifier($self);
+	if (!defined ($rdn)) {
+		return (undef); # we do not have that extension
+	} else {
+		$rdn=$rdn->{'authorityCertIssuer'}[0]->{'directoryName'};
+	}
+	$rdn->{'dn'} =[];
+    my $dn = $rdn->{'dn'};
+	$rdn = $rdn->{'rdnSequence'};
+	foreach my $r (@{$rdn}) {
+		$i=@{$r}[0];
+		if ($oid2attr{$i->{'type'}}) { 
+			$type = $oid2attr{$i->{'type'}};
+		 } else {
+            $type = $i->{'type'};
+        };
+		my @key= keys (%{$i->{'value'}});
+		push @{$dn},$type."=".$i->{'value'}->{$key[0]};
+	}
+	return $dn;
+}
+
+sub _authcert_part {
+	my $self = shift;
+	my $oid = shift;
+	my $rdn=_AuthorityKeyIdentifier($self);
+	if (!defined ($rdn)) {
+		return (undef); # we do not have that extension
+	} else {
+		$rdn=$rdn->{'authorityCertIssuer'}[0]->{'directoryName'}->{'rdnSequence'};
+	}
+	foreach my $r (@{$rdn}) {
+		my $i = @{$r}[0];
+		if ($i->{'type'} eq $oid) { 
+			my @key= keys (%{$i->{'value'}});
+			return $i->{'value'}->{$key[0]};
+		 }
+	}
+	return undef;
+}
+
+=head2 authority_serial
 
 Returns the authority's certificate serial number.
 
@@ -351,11 +732,11 @@ Returns the authority's certificate serial number.
 
 sub authority_serial {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertSerialNumber};
+    return ($self->_AuthorityKeyIdentifier)->{authorityCertSerialNumber};
 }
 
 
-=item key_identifier ( )
+=head2 key_identifier
 
 Returns the key identifier.
 
@@ -363,27 +744,22 @@ Returns the key identifier.
 
 sub key_identifier {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{keyIdentifier};
+    return ($self->_AuthorityKeyIdentifier)->{keyIdentifier};
 }
 
-
-#########################################################################
-# accessors - authorityCertIssuer
-#########################################################################
-
-=item authority_ca ( )
+=head2 authority_cn
 
 Returns the authority's ca.
 
 =cut back
 
-sub authority_ca {
+sub authority_cn {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}->[0][0]{value}{printableString};
+	return _authcert_part($self,'2.5.4.3');
 }
 
 
-=item authority_country ( )
+=head2 authority_country
 
 Returns the authority's country.
 
@@ -391,11 +767,10 @@ Returns the authority's country.
 
 sub authority_country {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}->[1][0]{value}{printableString};
+	return _authcert_part($self,'2.5.4.6');
 }
 
-
-=item authority_state ( )
+=head2 authority_state
 
 Returns the authority's state.
 
@@ -403,11 +778,11 @@ Returns the authority's state.
 
 sub authority_state {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}->[2][0]{value}{printableString};
+	return _authcert_part($self,'2.5.4.8');
+
 }
 
-
-=item authority_locality ( )
+=head2 authority_locality
 
 Returns the authority's locality.
 
@@ -415,11 +790,10 @@ Returns the authority's locality.
 
 sub authority_locality {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}->[3][0]{value}{printableString};
+	return _authcert_part($self,'2.5.4.7');
 }
 
-
-=item authority_org ( )
+=head2 authority_org
 
 Returns the authority's organization.
 
@@ -427,11 +801,10 @@ Returns the authority's organization.
 
 sub authority_org {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}->[4][0]{value}{printableString};
+	return _authcert_part($self,'2.5.4.10');
 }
 
-
-=item authority_email ( )
+=head2 authority_email
 
 Returns the authority's email.
 
@@ -439,93 +812,51 @@ Returns the authority's email.
 
 sub authority_email {
 	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[2]{extnValue}{authorityCertIssuer}[0]{directoryName}{rdnSequence}[5][0]{value}{ia5String};
+	return _authcert_part($self,'1.2.840.113549.1.9.1');
 }
 
+=head2 CRLDistributionPoints
 
-=item authority_crl ( )
-
-Returns the authority's crl in DER format.
+Returns the CRL distribution points as an array of strings (with one value usually)
 
 =cut back
 
-sub authority_crl {
-	my $self = shift;
-	return $self->{tbsCertificate}{extensions}[3]{extnValue}{ia5String};
+sub CRLDistributionPoints {
+    my $self=shift;
+    my $ext;
+    my $exts=$self->{'tbsCertificate'}->{'extensions'};
+    if (!defined $exts) {return undef;}; # no extensions in certificate
+    foreach $ext (@{$exts}) {
+        if ($ext->{'extnID'} eq '2.5.29.31') { #OID for SubjectAltName
+            my $crlp=_init('cRLDistributionPoints'); # get a parser for this
+            my $points=$crlp->decode($ext->{'extnValue'}); # decode the value
+			$points=$points->[0]->{'distributionPoint'}->{'fullName'};
+            if ($crlp->error) {
+                $self->{"_error"} = $crlp->error;
+                return undef;
+                }
+            foreach my $name (@{$points}) {
+               push @{$ext->{'crlpoints'}}, $name->{'uniformResourceIdentifier'};
+            }
+            return $ext->{'crlpoints'};
+        }
+    }
+    return undef;
 }
 
 
 #######################################################################
 # internal functions
 #######################################################################
-sub _decode {
-  my $der_cert		= shift;
-
-  my $asn		= _x509_ASN();
-  my $asn_BitString	= Convert::ASN1->new();
-  my $asn_OctetString	= Convert::ASN1->new();
-
-  $asn_BitString->prepare("bitString BIT STRING");
-  $asn_OctetString->prepare("octetString OCTET STRING");
-
-  my $asn_cert	= $asn->find('Certificate');
-  my $cert	= $asn_cert->decode($der_cert) || carp "asn decode error: ". $asn_cert->error;
-	
-  # decoders for extensions
-  my %extnoid2asn = (
-	'2.5.29.9'		=> $asn->find('SubjectDirectoryAttributes'),
-	'2.5.29.14'		=> $asn_OctetString,		# SubjectKeyIdentifier
-	'2.5.29.15'		=> $asn_BitString,	  	# keyUsage
-
-	'2.5.29.16'		=> $asn->find('PrivateKeyUsagePeriod'),
-	'2.5.29.17'		=> $asn->find('SubjectAltName'),
-	'2.5.29.18'		=> $asn->find('IssuerAltName'),
-	'2.5.29.19'		=> $asn->find('BasicConstraints'),
-	'2.5.29.30'		=> $asn->find('NameConstraints'),
-	'2.5.29.31'		=> $asn->find('cRLDistributionPoints'),
-	'2.5.29.32'		=> $asn->find('CertificatePolicies'),
-	'2.5.29.33'		=> $asn->find('PolicyMappings'),
-	'2.5.29.35'		=> $asn->find('AuthorityKeyIdentifier'),
-	'2.5.29.36'		=> $asn->find('PolicyConstraints'),
-	'2.5.29.37'		=> $asn->find('ExtKeyUsageSyntax'),
-
-	'2.16.840.1.113730.1.1'	=> $asn_BitString,		            # netscape-cert-type 
-
-	'2.16.840.1.113730.1.2'	=> $asn->find('DirectoryString'), # netscape-base-url 
-	'2.16.840.1.113730.1.3'	=> $asn->find('DirectoryString'), # netscape-revocation-url 
-	'2.16.840.1.113730.1.4'	=> $asn->find('DirectoryString'), # netscape-ca-revocation-url 
-	'2.16.840.1.113730.1.7'	=> $asn->find('DirectoryString'), # netscape-cert-renewal-url
-	'2.16.840.1.113730.1.8'	=> $asn->find('DirectoryString'), # netscape-ca-policy-url
-	'2.16.840.1.113730.1.12'=> $asn->find('DirectoryString'), # netscape-ssl-server-name
-	'2.16.840.1.113730.1.13'=> $asn->find('DirectoryString'), # netscape-comment
-  );
-
-  foreach my $extension ( @{$cert->{'tbsCertificate'}->{'extensions'}} ) {
-
-    if ( exists $extnoid2asn{$extension->{'extnID'}} ) {
-
-      $extension->{'extnValue'} =
-        ($extnoid2asn{$extension->{'extnID'}})->decode( $extension->{'extnValue'} );
-
-    } else {
-#      print STDERR "unknown ", 
-#
-#      $extension->{'critical'} ? "critical "
-#        : "", "extension: ", $extension->{'extnID'}, "\n";
-
-      asn_dump( $extension->{'extnValue'} );
-    }
-  }
-
-  return $cert;
-}
-
-sub _x509_ASN {
-	my $asn = Convert::ASN1->new;
-
-	$asn->prepare(<<ASN1) || carp "asn prepare error: ", $asn->error;
+sub _init {
+        my $what  = shift;
+        if ((!defined $what) || ('' eq $what)) {$what='Certificate'};
+		if (!defined $asn) {
+			$asn = Convert::ASN1->new;
+			$asn->prepare(<<ASN1);
 -- ASN.1 from RFC2459 and X.509(2001)
 -- Adapted for use with Convert::ASN1
+-- Id: x509decode,v 1.1 2002/02/10 16:41:28 gbarr Exp 
 
 -- attribute data types --
 
@@ -643,8 +974,8 @@ KeyIdentifier ::= OCTET STRING
 
 SubjectKeyIdentifier ::= KeyIdentifier
 
-
 -- key usage extension OID and syntax
+
 -- id-ce-keyUsage OBJECT IDENTIFIER ::=  { id-ce 15 }
 
 KeyUsage ::= BIT STRING --{
@@ -660,14 +991,14 @@ KeyUsage ::= BIT STRING --{
 
 
 -- private key usage period extension OID and syntax
+
 -- id-ce-privateKeyUsagePeriod OBJECT IDENTIFIER ::=  { id-ce 16 }
 
 PrivateKeyUsagePeriod ::= SEQUENCE {
      notBefore       [0]     GeneralizedTime OPTIONAL,
      notAfter        [1]     GeneralizedTime OPTIONAL }
      -- either notBefore or notAfter shall be present
-
-
+     
 -- certificate policies extension OID and syntax
 -- id-ce-certificatePolicies OBJECT IDENTIFIER ::=  { id-ce 32 }
 
@@ -737,7 +1068,7 @@ GeneralName ::= CHOICE {
      registeredID                    [8]     OBJECT IDENTIFIER }
 
 -- AnotherName replaces OTHER-NAME ::= TYPE-IDENTIFIER, as
--- TYPE-IDENTIFIER is not supported in the '88 ASN.1 syntax
+-- TYPE-IDENTIFIER is not supported in the 88 ASN.1 syntax
 
 AnotherName ::= SEQUENCE {
      type    OBJECT IDENTIFIER,
@@ -837,9 +1168,15 @@ KeyPurposeId ::= OBJECT IDENTIFIER
 -- id-kp-ipsecUser       OBJECT IDENTIFIER ::= { id-kp 7 }
 -- id-kp-timeStamping    OBJECT IDENTIFIER ::= { id-kp 8 }
 ASN1
-
-	return $asn;
+        }
+        my $self= $asn->find($what);
+        return $self;
 }
+
+=head1 SEE ALSO
+
+See the examples of C<Convert::ASN1> and the <perl-ldap@perl.org> Mailing List.
+An example on how to load certificates can be found in F<t\Crypt-X509.t>.
 
 =head1 ACKNOWLEDGEMENTS
 
@@ -848,7 +1185,8 @@ Convert::ASN1 in 2002 by Norbert Klasen.
 
 =head1 AUTHOR
 
-Mike Jackson <mj@sci.fi>
+Mike Jackson <mj@sci.fi> , 
+Alexander Jung <alexander.w.jung@gmail.com>
 
 =head1 COPYRIGHT
 
@@ -861,3 +1199,4 @@ it and/or modify it under the same terms as Perl itself.
 =cut
 
 1;
+__END__

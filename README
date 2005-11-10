@@ -1,4 +1,4 @@
-Crypt-X509 version 0.01
+Crypt-X509 version 0.2
 =======================
 
 Crypt::X509 is an object oriented X.509 certificate parser with numerous
@@ -19,13 +19,286 @@ This module requires:
 
   Convert::ASN1
 
-COPYRIGHT AND LICENCE
+NAME
+    Crypt::X509 - Parses an X.509 certificate
 
-This module is based in part on the x509decode script, which was
-contributed to Convert::ASN1 in 2002 by Norbert Klasen.
+SYNOPSIS
+     use Crypt::X509;
 
-Copyright (c) 2005 Mike Jackson <mj@sci.fi>.
-Copyright (c) 2001-2002 Norbert Klasen, DAASI International GmbH.
+     $decoded = Crypt::X509->new( cert => $cert );
 
-All rights reserved. This program is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself.
+     $subject_email = $decoded->subject_email;
+     print "do not use after: ".gmtime($decoded->not_after)." GMT\n";
+
+DESCRIPTION
+    Crypt::X509 parses X.509 certificates. Methods are provided for
+    accessing most certificate elements.
+
+    It is based on the generic ASN.1 module by Graham Barr, on the
+    x509decode example by Norbert Klasen and contributions on the
+    perl-ldap-dev-Mailinglist by Chriss Ridd.
+
+CONSTRUCTOR
+  new ( OPTIONS )
+    Creates and returns a parsed X.509 certificate hash, containing the
+    parsed contents. The data is organised as specified in RFC 2459. By
+    default only the first ASN.1 Layer is decoded. Nested decoding is done
+    automagically through the data access methods.
+
+    cert => $certificate
+        A variable containing the DER formatted certificate to be parsed
+        (eg. as stored in "usercertificate;binary" attribute in an
+        LDAP-directory).
+
+   Example:
+      use Crypt::X509;
+      use Data::Dumper;
+  
+      $decoded= Crypt::X509->new(cert => $cert);
+  
+      print Dumper($decoded);
+
+METHODS
+  error
+    Returns the last error from parsing, "undef" when no error occured. This
+    error is updated on deeper parsing with the data access methods.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      if ($decoded->error) {
+            warn "Error on parsing Certificate:".$decoded->error;
+      }
+
+DATA ACCESS METHODS
+    You can access all parsed data directly from the returned hash. For
+    convenience the following methods have been implemented to give quick
+    access to the most-used certificate attributes.
+
+  version
+    Returns the certificate's version.
+
+  serial
+    returns the serial number (integer or Math::BigInt Object, that gets
+    automagic evaluated in scalar context) from the certificate
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate has serial number:".$decoded->serial."\n";
+
+  not_before
+    returns the GMT-timestamp of the certificate's beginning date of
+    validity.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      if ($decoded->notBefore < time()) {
+            warn "Certificate: not yet valid!";
+      }
+
+  not_after
+    returns the GMT-timestamp of the certificate's ending date of validity.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate expires on ".gmtime($decoded->not_after)." GMT\n";
+
+  signature
+    Return's the certificate's signature in binary DER format.
+
+  pubkey
+    Returns the certificate's public key in binary DER format.
+
+  pubkey_algorithm
+    Returns the algorithm as OID string which the public key was created
+    with.
+
+  sig_algorithm
+    Returns the certificate's signature algorithm as OID string
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate signature is encrypted with:".$decoded->sig_algorithm."\n";
+  
+      Example Output: Certificate signature is encrypted with: 1.2.840.113549.1.1.5
+
+  SigEncAlg
+    returns the signature encryption algorithm (e.g. 'RSA') as string.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate signature is encrypted with:".$decoded->SigEncAlg."\n";
+  
+      Example Output: Certificate signature is encrypted with: RSA
+  
+  SigHashAlg
+    returns the signature hashing algorithm (e.g. 'SHA1') as string.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate signature is hashed with:".$decoded->SigHashAlg."\n";
+
+      Example Output: Certificate signature is encrypted with: SHA1
+
+  Subject
+    returns a pointer to an array of strings containing subject nameparts of
+    the certificate. Attributenames for the most common Attributes are
+    translated from the OID-Numbers, unknown numbers are output verbatim.
+
+   Example:
+      $decoded= Convert::ASN1::X509->new($cert);
+      print "DN for this Certificate is:".join(',',@{$decoded->Subject})."\n";
+
+  subject_country
+    Returns the string value for subject's country (= the value with the OID
+    2.5.4.6 or in DN Syntax everything after "C="). Only the first entry is
+    returned. "undef" if subject contains no country attribute.
+
+  subject_state
+    Returns the string value for subject's state or province (= the value
+    with the OID 2.5.4.8 or in DN Syntax everything after "S="). Only the
+    first entry is returned. "undef" if subject contains no state attribute.
+
+  subject_org
+    Returns the string value for subject's organization (= the value with
+    the OID 2.5.4.10 or in DN Syntax everything after "O="). Only the first
+    entry is returned. "undef" if subject contains no organization
+    attribute.
+
+  subject_ou
+    Returns the string value for subject's organizational unit (= the value
+    with the OID 2.5.4.11 or in DN Syntax everything after "OU="). Only the
+    first entry is returned. "undef" if subject contains no organization
+    attribute.
+
+  subject_cn
+    Returns the string value for subject's common name (= the value with the
+    OID 2.5.4.3 or in DN Syntax everything after "CN="). Only the first
+    entry is returned. "undef" if subject contains no common name attribute.
+
+  subject_email
+    Returns the string value for subject's email address (= the value with
+    the OID 1.2.840.113549.1.9.1 or in DN Syntax everything after "E=").
+    Only the first entry is returned. "undef" if subject contains no email
+    attribute.
+
+  Issuer
+    returns a pointer to an array of strings building the DN of the
+    certificate issuer (= the DN of the CA). Attributenames for the most
+    common Attributes are translated from the OID-Numbers, unknown numbers
+    are output verbatim.
+
+   Example:
+      $decoded= Crypt::X509->new($cert);
+      print "Certificate was issued by:".join(',',@{$decoded->Issuer})."\n";
+
+  issuer_cn
+    Returns the string value for issuer's common name (= the value with the
+    OID 2.5.4.3 or in DN Syntax everything after "CN="). Only the first
+    entry is returned. "undef" if issuer contains no common name attribute.
+
+  issuer_country
+    Returns the string value for issuer's country (= the value with the OID
+    2.5.4.6 or in DN Syntax everything after "C="). Only the first entry is
+    returned. "undef" if issuer contains no country attribute.
+
+  issuer_state
+    Returns the string value for issuer's state or province (= the value
+    with the OID 2.5.4.8 or in DN Syntax everything after "S="). Only the
+    first entry is returned. "undef" if issuer contains no state attribute.
+
+  issuer_locality
+    Returns the string value for issuer's locality (= the value with the OID
+    2.5.4.7 or in DN Syntax everything after "L="). Only the first entry is
+    returned. "undef" if issuer contains no locality attribute.
+
+  issuer_org
+    Returns the string value for issuer's organization (= the value with the
+    OID 2.5.4.10 or in DN Syntax everything after "O="). Only the first
+    entry is returned. "undef" if issuer contains no organization attribute.
+
+  issuer_email
+    Returns the string value for issuer's email address (= the value with
+    the OID 1.2.840.113549.1.9.1 or in DN Syntax everything after "E=").
+    Only the first entry is returned. "undef" if issuer contains no email
+    attribute.
+
+  KeyUsage
+    returns a pointer to an array of strings describing the valid Usages for
+    this certificate. "undef" is returned, when the extension is not set in
+    the certificate.
+
+   Example:
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Allowed usages for this Certificate are:\n".join("\n",@{$decoded->KeyUsage})."\n";
+
+      Example Output:
+      Allowed usages for this Certificate are: 
+      digitalSignature
+      keyEncipherment
+      dataEncipherment
+
+  SubjectAltName
+    returns a pointer to an array of strings containing alternative
+    Subjectnames or "undef" if the extension is not filled. Usually this
+    Extension holds the e-Mail address for person-certificates or DNS-Names
+    for server certificates.
+
+      $decoded= Crypt::X509->new($cert);
+      print "E-Mail or Hostnames in this Certificates is/are:".join("\n",@{$decoded->SubjectAltName})."\n";
+
+  authorityCertIssuer
+    returns a pointer to an array of strings building the DN of the
+    Authority Cert Issuer. Attributenames for the most common Attributes are
+    translated from the OID-Numbers, unknown numbers are output verbatim.
+    undef if the extension is not set in the certificate.
+
+   Example:
+      $decoded= Crypt::X509->new($cert);
+      print "Certificate was authorised by:".join(',',@{$decoded->authorityCertIssuer})."\n";
+
+  authority_serial
+    Returns the authority's certificate serial number.
+
+  key_identifier
+    Returns the key identifier.
+
+  authority_cn
+    Returns the authority's ca.
+
+  authority_country
+    Returns the authority's country.
+
+  authority_state
+    Returns the authority's state.
+
+  authority_locality
+    Returns the authority's locality.
+
+  authority_org
+    Returns the authority's organization.
+
+  authority_email
+    Returns the authority's email.
+
+  CRLDistributionPoints
+    Returns the CRL distribution points as an array of strings (with one
+    value usually)
+
+SEE ALSO
+    See the examples of "Convert::ASN1" and the <perl-ldap@perl.org> Mailing
+    List. An example on how to load certificates can be found in
+    t\Crypt-X509.t.
+
+ACKNOWLEDGEMENTS
+    This module is based on the x509decode script, which was contributed to
+    Convert::ASN1 in 2002 by Norbert Klasen.
+
+AUTHOR
+    Mike Jackson <mj@sci.fi> , Alexander Jung <alexander.w.jung@gmail.com>
+
+COPYRIGHT
+    Copyright (c) 2005 Mike Jackson <mj@sci.fi>. Copyright (c) 2001-2002
+    Norbert Klasen, DAASI International GmbH.
+
+    All rights reserved. This program is free software; you can redistribute
+    it and/or modify it under the same terms as Perl itself.

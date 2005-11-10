@@ -3,5 +3,9 @@ Makefile.PL
 MANIFEST
 README
 t/Crypt-X509.t
+t/aj.cer
+t/aj2.cer
+t/allianz_root.cer
+t/verisign.der
 lib/Crypt/X509.pm
-META.yml                                 Module meta-data (added by MakeMaker)
+META.yml
