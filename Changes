@@ -1,6 +1,9 @@
 Revision history for Perl extension Crypt::X509.
 
-0.2   Tue Aug 24 2005 ajung
+0.21  Tue Nov 30 2005 ajung
+	- removed dependency on Perl 5.8.5
+
+0.2   Tue Aug 25 2005 ajung
 	- integrating Convert::ASN1:X509 with Crypt::X509
 
 0.12  (Convert::ASN1:X509) Tue Aug 18 2005 ajung
