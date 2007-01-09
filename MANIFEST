@@ -1,11 +1,14 @@
 Changes
+lib/Crypt/X509.pm
 Makefile.PL
 MANIFEST
+META.yml
 README
-t/Crypt-X509.t
 t/aj.cer
 t/aj2.cer
 t/allianz_root.cer
+t/Crypt-X509.t
+t/new_root_ca.cer
+t/subca_2.cer
+t/telesec_799972029.crt
 t/verisign.der
-lib/Crypt/X509.pm
-META.yml

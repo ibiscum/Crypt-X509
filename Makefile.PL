@@ -7,5 +7,5 @@ WriteMakefile(
     PREREQ_PM         => {Convert::ASN1 => 0.19},
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Crypt/X509.pm',
-       AUTHOR         => 'Mike Jackson, Alexander Jung') : ()),
+       AUTHOR         => 'Mike Jackson, Alexander Jung, Duncan Segrest') : ()),
 );

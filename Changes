@@ -1,5 +1,23 @@
 Revision history for Perl extension Crypt::X509.
 
+0.32  Die Jan 09 2007 ajung
+	- fixed problem with not found issuer and subject parts
+	  (found by Michael Steller)
+
+0.31  Mon Jan 08 2007 ajung
+	- included generalTime lookup as fallback for not_after and not_before
+	  (suggested by Michael Steller)
+	- some documentation layout fixups
+
+0.3   Wed Dec 27 2006 gigageek
+	- added CRLDistributionPoints2 function
+	- updated SubjectAltNames function
+	- added BasicConstraints function
+	- added CertificatePolicies function
+	- added SubjectInfoAccess function
+	- added SubjectDirectoryAttributes function
+	- added subject_keyidentifier funtion
+
 0.21  Tue Nov 30 2005 ajung
 	- removed dependency on Perl 5.8.5
 

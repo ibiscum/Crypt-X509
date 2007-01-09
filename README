@@ -1,4 +1,4 @@
-Crypt-X509 version 0.21
+Crypt-X509 version 0.31
 =======================
 
 Crypt::X509 is an object oriented X.509 certificate parser with numerous
@@ -20,7 +20,7 @@ This module requires:
   Convert::ASN1
 
 NAME
-    Crypt::X509 - Parses an X.509 certificate
+    Crypt::X509 - Parse a X.509 certificate
 
 SYNOPSIS
      use Crypt::X509;
@@ -29,6 +29,9 @@ SYNOPSIS
 
      $subject_email = $decoded->subject_email;
      print "do not use after: ".gmtime($decoded->not_after)." GMT\n";
+
+REQUIRES
+    Convert::ASN1
 
 DESCRIPTION
     Crypt::X509 parses X.509 certificates. Methods are provided for
@@ -50,7 +53,6 @@ CONSTRUCTOR
         (eg. as stored in "usercertificate;binary" attribute in an
         LDAP-directory).
 
-   Example:
       use Crypt::X509;
       use Data::Dumper;
   
@@ -63,7 +65,6 @@ METHODS
     Returns the last error from parsing, "undef" when no error occured. This
     error is updated on deeper parsing with the data access methods.
 
-   Example:
       $decoded= Crypt::X509->new(cert => $cert);
       if ($decoded->error) {
             warn "Error on parsing Certificate:".$decoded->error;
@@ -75,21 +76,29 @@ DATA ACCESS METHODS
     access to the most-used certificate attributes.
 
   version
-    Returns the certificate's version.
+    Returns the certificate's version as an integer. NOTE that version is
+    defined as an Integer where 0 = v1, 1 = v2, and 2 = v3.
+
+  version_string
+    Returns the certificate's version as a string value.
 
   serial
     returns the serial number (integer or Math::BigInt Object, that gets
     automagic evaluated in scalar context) from the certificate
 
-   Example:
       $decoded= Crypt::X509->new(cert => $cert);
-      print "Certificate has serial number:".$decoded->serial."\n";
+      print "Certificate has serial number:".$decoded->serial."\n";  
 
   not_before
     returns the GMT-timestamp of the certificate's beginning date of
-    validity.
+    validity. If the Certificate holds this Entry in utcTime, it is
+    guaranteed by the RFC to been correct.
 
-   Example:
+    As utcTime is limited to 32-bit values (like unix-timestamps) newer
+    certificates hold the timesamps as "generalTime"-entries. The contents
+    of "generalTime"-entries are not well defined in the RFC and are
+    returned by this module unmodified, if no utcTime-entry is found.
+
       $decoded= Crypt::X509->new(cert => $cert);
       if ($decoded->notBefore < time()) {
             warn "Certificate: not yet valid!";
@@ -97,8 +106,14 @@ DATA ACCESS METHODS
 
   not_after
     returns the GMT-timestamp of the certificate's ending date of validity.
+    If the Certificate holds this Entry in utcTime, it is guaranteed by the
+    RFC to been correct.
 
-   Example:
+    As utcTime is limited to 32-bit values (like unix-timestamps) newer
+    certificates hold the timesamps as "generalTime"-entries. The contents
+    of "generalTime"-entries are not well defined in the RFC and are
+    returned by this module unmodified, if no utcTime-entry is found.
+
       $decoded= Crypt::X509->new(cert => $cert);
       print "Certificate expires on ".gmtime($decoded->not_after)." GMT\n";
 
@@ -108,32 +123,41 @@ DATA ACCESS METHODS
   pubkey
     Returns the certificate's public key in binary DER format.
 
+  pubkey_size
+    Returns the certificate's public key size.
+
   pubkey_algorithm
     Returns the algorithm as OID string which the public key was created
     with.
 
+  PubKeyAlg
+    returns the subject public key encryption algorithm (e.g. 'RSA') as
+    string.
+
+      $decoded= Crypt::X509->new(cert => $cert);
+      print "Certificate public key is encrypted with:".$decoded->PubKeyAlg."\n";
+  
+      Example Output: Certificate public key is encrypted with: RSA
+  
   sig_algorithm
     Returns the certificate's signature algorithm as OID string
 
-   Example:
       $decoded= Crypt::X509->new(cert => $cert);
-      print "Certificate signature is encrypted with:".$decoded->sig_algorithm."\n";
+      print "Certificate signature is encrypted with:".$decoded->sig_algorithm."\n";>
   
       Example Output: Certificate signature is encrypted with: 1.2.840.113549.1.1.5
 
   SigEncAlg
     returns the signature encryption algorithm (e.g. 'RSA') as string.
 
-   Example:
       $decoded= Crypt::X509->new(cert => $cert);
       print "Certificate signature is encrypted with:".$decoded->SigEncAlg."\n";
   
       Example Output: Certificate signature is encrypted with: RSA
-  
+
   SigHashAlg
     returns the signature hashing algorithm (e.g. 'SHA1') as string.
 
-   Example:
       $decoded= Crypt::X509->new(cert => $cert);
       print "Certificate signature is hashed with:".$decoded->SigHashAlg."\n";
 
@@ -144,7 +168,6 @@ DATA ACCESS METHODS
     the certificate. Attributenames for the most common Attributes are
     translated from the OID-Numbers, unknown numbers are output verbatim.
 
-   Example:
       $decoded= Convert::ASN1::X509->new($cert);
       print "DN for this Certificate is:".join(',',@{$decoded->Subject})."\n";
 
@@ -187,7 +210,6 @@ DATA ACCESS METHODS
     common Attributes are translated from the OID-Numbers, unknown numbers
     are output verbatim.
 
-   Example:
       $decoded= Crypt::X509->new($cert);
       print "Certificate was issued by:".join(',',@{$decoded->Issuer})."\n";
 
@@ -227,12 +249,14 @@ DATA ACCESS METHODS
     this certificate. "undef" is returned, when the extension is not set in
     the certificate.
 
-   Example:
+    If the extension is marked critical, this is also reported.
+
       $decoded= Crypt::X509->new(cert => $cert);
       print "Allowed usages for this Certificate are:\n".join("\n",@{$decoded->KeyUsage})."\n";
 
       Example Output:
-      Allowed usages for this Certificate are: 
+      Allowed usages for this Certificate are:
+      critical 
       digitalSignature
       keyEncipherment
       dataEncipherment
@@ -243,8 +267,12 @@ DATA ACCESS METHODS
     Extension holds the e-Mail address for person-certificates or DNS-Names
     for server certificates.
 
+    It also pre-pends the field type (ie rfc822Name) to the returned value.
+
       $decoded= Crypt::X509->new($cert);
-      print "E-Mail or Hostnames in this Certificates is/are:".join("\n",@{$decoded->SubjectAltName})."\n";
+      print "E-Mail or Hostnames in this Certificates is/are:", join(", ", @{$decoded->SubjectAltName}), "\n";
+  
+      Example Output: E-Mail or Hostnames in this Certificates is/are: rfc822Name=user@server.com
 
   authorityCertIssuer
     returns a pointer to an array of strings building the DN of the
@@ -252,7 +280,6 @@ DATA ACCESS METHODS
     translated from the OID-Numbers, unknown numbers are output verbatim.
     undef if the extension is not set in the certificate.
 
-   Example:
       $decoded= Crypt::X509->new($cert);
       print "Certificate was authorised by:".join(',',@{$decoded->authorityCertIssuer})."\n";
 
@@ -260,7 +287,7 @@ DATA ACCESS METHODS
     Returns the authority's certificate serial number.
 
   key_identifier
-    Returns the key identifier.
+    Returns the authority key identifier or undef if it is a rooted cert
 
   authority_cn
     Returns the authority's ca.
@@ -284,6 +311,54 @@ DATA ACCESS METHODS
     Returns the CRL distribution points as an array of strings (with one
     value usually)
 
+  CRLDistributionPoints2
+    Returns the CRL distribution points as an array of hashes (allowing for
+    some variations)
+
+  CertificatePolicies
+    Returns the CertificatePolicies as an array of strings
+
+  EntrustVersionInfo
+    Returns the EntrustVersion as a string
+
+            print "Entrust Version: ", $decoded->EntrustVersion, "\n";
+        
+            Example Output: Entrust Version: V7.0
+
+  SubjectDirectoryAttributes
+    Returns the SubjectDirectoryAttributes as an array of key = value pairs,
+    to include a data type
+
+            print "Subject Directory Attributes: ", join( ', ' , @{ $decoded->SubjectDirectoryAttributes } ), "\n";
+        
+            Example Output: Subject Directory Attributes: 1.2.840.113533.7.68.29 = 7 (integer)
+
+  BasicConstraints
+    Returns the BasicConstraints as an array and the criticallity
+    pre-pended.
+
+  subject_keyidentifier
+    Returns the subject key identifier from the extensions.
+
+  SubjectInfoAccess
+    Returns the SubjectInfoAccess as an array of hashes with key=value
+    pairs.
+
+                    print "Subject Info Access: ";
+                    if ( defined $decoded->SubjectInfoAccess ) {
+                            my %SIA = $decoded->SubjectInfoAccess;
+                            for my $key ( keys %SIA ) {
+                                    print "\n\t$key: \n\t";
+                                    print join( "\n\t" , @{ $SIA{$key} } ), "\n";
+                            }
+                    } else { print "\n" }
+        
+            Example Output: 
+                    Subject Info Access: 
+                            1.3.6.1.5.5.7.48.5: 
+                            uniformResourceIdentifier = http://pki.treas.gov/root_sia.p7c
+                            uniformResourceIdentifier = ldap://ldap.treas.gov/ou=US%20Treasury%20Root%20CA,ou=Certification%20Authorities,ou=Department%20of%20the%20Treasury,o=U.S.%20Government,c=US?cACertificate;binary,crossCertificatePair;binary
+
 SEE ALSO
     See the examples of "Convert::ASN1" and the <perl-ldap@perl.org> Mailing
     List. An example on how to load certificates can be found in
@@ -293,8 +368,9 @@ ACKNOWLEDGEMENTS
     This module is based on the x509decode script, which was contributed to
     Convert::ASN1 in 2002 by Norbert Klasen.
 
-AUTHOR
-    Mike Jackson <mj@sci.fi> , Alexander Jung <alexander.w.jung@gmail.com>
+AUTHORS
+    Mike Jackson <mj@sci.fi>, Alexander Jung <alexander.w.jung@gmail.com>,
+    Duncan Segrest <duncan@gigageek.info>
 
 COPYRIGHT
     Copyright (c) 2005 Mike Jackson <mj@sci.fi>. Copyright (c) 2001-2002
@@ -302,3 +378,4 @@ COPYRIGHT
 
     All rights reserved. This program is free software; you can redistribute
     it and/or modify it under the same terms as Perl itself.
+
