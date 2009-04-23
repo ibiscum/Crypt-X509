@@ -1,44 +1,37 @@
 package Crypt::X509;
-
 use Carp;
 use strict;
 use warnings;
 use Convert::ASN1 qw(:io :debug);
-
-
 require Exporter;
-
-our @ISA = qw(Exporter);
+our @ISA         = qw(Exporter);
 our %EXPORT_TAGS = ( 'all' => [qw()] );
-our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
-our @EXPORT = qw(error new not_before not_after serial);
-our $VERSION = '0.32';
-
+our @EXPORT_OK   = ( @{ $EXPORT_TAGS{'all'} } );
+our @EXPORT      = qw(error new not_before not_after serial);
+our $VERSION     = '0.40';
 my $parser = undef;
-my $asn = undef;
-my $error = undef;
-
-my %oid2enchash= (
-	'1.2.840.113549.1.1.1' => {'enc' => 'RSA'},
-	'1.2.840.113549.1.1.2' => {'enc' => 'RSA', 'hash' => 'MD2'},
-	'1.2.840.113549.1.1.3' => {'enc' => 'RSA', 'hash' => 'MD4'},
-	'1.2.840.113549.1.1.4' => {'enc' => 'RSA', 'hash' => 'MD5'},
-	'1.2.840.113549.1.1.5' => {'enc' => 'RSA', 'hash' => 'SHA1'},
-	'1.2.840.113549.1.1.6' => {'enc' => 'OAEP'}
+my $asn    = undef;
+my $error  = undef;
+my %oid2enchash = (
+					'1.2.840.113549.1.1.1' => { 'enc' => 'RSA' },
+					'1.2.840.113549.1.1.2' => { 'enc' => 'RSA', 'hash' => 'MD2' },
+					'1.2.840.113549.1.1.3' => { 'enc' => 'RSA', 'hash' => 'MD4' },
+					'1.2.840.113549.1.1.4' => { 'enc' => 'RSA', 'hash' => 'MD5' },
+					'1.2.840.113549.1.1.5' => { 'enc' => 'RSA', 'hash' => 'SHA1' },
+					'1.2.840.113549.1.1.6' => { 'enc' => 'OAEP' }
 );
-
 my %oid2attr = (
-                "2.5.4.3" => "CN",
-                "2.5.4.6" => "C",
-                "2.5.4.7" => "l",
-                "2.5.4.8" => "S",
-                "2.5.4.10" => "O",
-                "2.5.4.11" => "OU",
-                "1.2.840.113549.1.9.1" => "E",
-                "0.9.2342.19200300.100.1.1" => "UID",
-                "0.9.2342.19200300.100.1.25" => "DC",
-                "0.2.262.1.10.7.20" => "nameDistinguisher"
-               );
+				 "2.5.4.3"                    => "CN",
+				 "2.5.4.6"                    => "C",
+				 "2.5.4.7"                    => "l",
+				 "2.5.4.8"                    => "S",
+				 "2.5.4.10"                   => "O",
+				 "2.5.4.11"                   => "OU",
+				 "1.2.840.113549.1.9.1"       => "E",
+				 "0.9.2342.19200300.100.1.1"  => "UID",
+				 "0.9.2342.19200300.100.1.25" => "DC",
+				 "0.2.262.1.10.7.20"          => "nameDistinguisher"
+);
 
 =head1 NAME
 
@@ -95,14 +88,13 @@ LDAP-directory).
 =cut back
 
 sub new {
-	my ($class,%args) = @_;
-	if (!defined ($parser)) {
-		$parser=_init();
+	my ( $class, %args ) = @_;
+	if ( !defined($parser) ) {
+		$parser = _init();
 	}
-	my $self = $parser->decode($args{'cert'});
-	
+	my $self = $parser->decode( $args{'cert'} );
 	$self->{"_error"} = $parser->error;
-	bless ($self, $class);
+	bless( $self, $class );
 	return $self;
 }
 
@@ -149,9 +141,10 @@ sub version {
 Returns the certificate's version as a string value. 
 
 =cut back
+
 sub version_string {
 	my $self = shift;
-	my $v = $self->{tbsCertificate}{version};
+	my $v    = $self->{tbsCertificate}{version};
 	return "v1" if $v == 0;
 	return "v2" if $v == 1;
 	return "v3" if $v == 2;
@@ -194,16 +187,14 @@ are returned by this module unmodified>, if no utcTime-entry is found.
 
 sub not_before {
 	my $self = shift;
-	if ($self->{tbsCertificate}{validity}{notBefore}{utcTime}) {
+	if ( $self->{tbsCertificate}{validity}{notBefore}{utcTime} ) {
 		return $self->{tbsCertificate}{validity}{notBefore}{utcTime};
-	} elsif ($self->{tbsCertificate}{validity}{notBefore}{generalTime}) {
+	} elsif ( $self->{tbsCertificate}{validity}{notBefore}{generalTime} ) {
 		return $self->{tbsCertificate}{validity}{notBefore}{generalTime};
 	} else {
 		return undef;
 	}
-	
 }
-
 
 =head2 not_after
 
@@ -224,9 +215,9 @@ are returned by this module unmodified>, if no utcTime-entry is found.
 
 sub not_after {
 	my $self = shift;
-	if ($self->{tbsCertificate}{validity}{notAfter}{utcTime}) {
+	if ( $self->{tbsCertificate}{validity}{notAfter}{utcTime} ) {
 		return $self->{tbsCertificate}{validity}{notAfter}{utcTime};
-	} elsif ($self->{tbsCertificate}{validity}{notAfter}{generalTime}) {
+	} elsif ( $self->{tbsCertificate}{validity}{notAfter}{generalTime} ) {
 		return $self->{tbsCertificate}{validity}{notAfter}{generalTime};
 	} else {
 		return undef;
@@ -321,8 +312,8 @@ returns the signature encryption algorithm (e.g. 'RSA') as string.
 =cut back
 
 sub SigEncAlg {
-	my $self=shift;
-	return $oid2enchash{$self->{'signatureAlgorithm'}->{'algorithm'}}->{'enc'};
+	my $self = shift;
+	return $oid2enchash{ $self->{'signatureAlgorithm'}->{'algorithm'} }->{'enc'};
 }
 
 =head2 SigHashAlg
@@ -337,11 +328,9 @@ returns the signature hashing algorithm (e.g. 'SHA1') as string.
 =cut back
 
 sub SigHashAlg {
-	my $self=shift;
-	return $oid2enchash{$self->{'signatureAlgorithm'}->{'algorithm'}}->{'hash'};
+	my $self = shift;
+	return $oid2enchash{ $self->{'signatureAlgorithm'}->{'algorithm'} }->{'hash'};
 }
-
-
 #########################################################################
 # accessors - subject
 #########################################################################
@@ -358,35 +347,35 @@ from the OID-Numbers, unknown numbers are output verbatim.
 =cut back
 
 sub Subject {
-	my $self=shift;
-	my ($i,$type);
-	my $subjrdn=$self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
-	$self->{'tbsCertificate'}->{'subject'}->{'dn'}=[];
-	my $subjdn=$self->{'tbsCertificate'}->{'subject'}->{'dn'};
-	foreach my $subj (@{$subjrdn}) {
-		foreach my $i (@{$subj}) {
-			if ($oid2attr{$i->{'type'}}) { 
-				$type = $oid2attr{$i->{'type'}};
-			 } else {
-	            $type = $i->{'type'};
-	        };
-			my @key= keys (%{$i->{'value'}});
-			push @{$subjdn},$type."=".$i->{'value'}->{$key[0]};
+	my $self = shift;
+	my ( $i, $type );
+	my $subjrdn = $self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
+	$self->{'tbsCertificate'}->{'subject'}->{'dn'} = [];
+	my $subjdn = $self->{'tbsCertificate'}->{'subject'}->{'dn'};
+	foreach my $subj ( @{$subjrdn} ) {
+		foreach my $i ( @{$subj} ) {
+			if ( $oid2attr{ $i->{'type'} } ) {
+				$type = $oid2attr{ $i->{'type'} };
+			} else {
+				$type = $i->{'type'};
+			}
+			my @key = keys( %{ $i->{'value'} } );
+			push @{$subjdn}, $type . "=" . $i->{'value'}->{ $key[0] };
 		}
 	}
 	return $subjdn;
 }
 
 sub _subject_part {
-	my $self = shift;
-	my $oid = shift;
-	my $subjrdn=$self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
-	foreach my $subj (@{$subjrdn}) {
-		foreach my $i (@{$subj}) {
-			if ($i->{'type'} eq $oid) { 
-				my @key= keys (%{$i->{'value'}});
-				return $i->{'value'}->{$key[0]};
-			 }
+	my $self    = shift;
+	my $oid     = shift;
+	my $subjrdn = $self->{'tbsCertificate'}->{'subject'}->{'rdnSequence'};
+	foreach my $subj ( @{$subjrdn} ) {
+		foreach my $i ( @{$subj} ) {
+			if ( $i->{'type'} eq $oid ) {
+				my @key = keys( %{ $i->{'value'} } );
+				return $i->{'value'}->{ $key[0] };
+			}
 		}
 	}
 	return undef;
@@ -402,9 +391,8 @@ Only the first entry is returned. C<undef> if subject contains no country attrib
 
 sub subject_country {
 	my $self = shift;
-	return _subject_part($self,'2.5.4.6');
+	return _subject_part( $self, '2.5.4.6' );
 }
-
 
 =head2 subject_state
 
@@ -416,7 +404,7 @@ Only the first entry is returned. C<undef> if subject contains no state attribut
 
 sub subject_state {
 	my $self = shift;
-	return _subject_part($self,'2.5.4.8');
+	return _subject_part( $self, '2.5.4.8' );
 }
 
 =head2 subject_org
@@ -429,9 +417,8 @@ Only the first entry is returned. C<undef> if subject contains no organization a
 
 sub subject_org {
 	my $self = shift;
-	return _subject_part($self,'2.5.4.10');
+	return _subject_part( $self, '2.5.4.10' );
 }
-
 
 =head2 subject_ou
 
@@ -443,9 +430,8 @@ Only the first entry is returned. C<undef> if subject contains no organization a
 
 sub subject_ou {
 	my $self = shift;
-	return _subject_part($self,'2.5.4.11');
+	return _subject_part( $self, '2.5.4.11' );
 }
-
 
 =head2 subject_cn 
 
@@ -457,9 +443,8 @@ Only the first entry is returned. C<undef> if subject contains no common name at
 
 sub subject_cn {
 	my $self = shift;
-	return _subject_part($self,'2.5.4.3');
+	return _subject_part( $self, '2.5.4.3' );
 }
-
 
 =head2 subject_email
 
@@ -471,10 +456,8 @@ Only the first entry is returned. C<undef> if subject contains no email attribut
 
 sub subject_email {
 	my $self = shift;
-	return _subject_part($self,'1.2.840.113549.1.9.1');
+	return _subject_part( $self, '1.2.840.113549.1.9.1' );
 }
-
-
 #########################################################################
 # accessors - issuer
 #########################################################################
@@ -490,37 +473,36 @@ are translated from the OID-Numbers, unknown numbers are output verbatim.
 
 =cut back
 
-
 sub Issuer {
-	my $self=shift;
-	my ($i,$type);
-	my $issuerdn=$self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
-	$self->{'tbsCertificate'}->{'issuer'}->{'dn'}=[];
-	my $issuedn=$self->{'tbsCertificate'}->{'issuer'}->{'dn'};
-	foreach my $issue (@{$issuerdn}) {
-		foreach my $i (@{$issue}) {
-			if ($oid2attr{$i->{'type'}}) { 
-				$type = $oid2attr{$i->{'type'}};
-			 } else {
-	            $type = $i->{'type'};
-	        };
-			my @key= keys (%{$i->{'value'}});
-			push @{$issuedn},$type."=".$i->{'value'}->{$key[0]};
+	my $self = shift;
+	my ( $i, $type );
+	my $issuerdn = $self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
+	$self->{'tbsCertificate'}->{'issuer'}->{'dn'} = [];
+	my $issuedn = $self->{'tbsCertificate'}->{'issuer'}->{'dn'};
+	foreach my $issue ( @{$issuerdn} ) {
+		foreach my $i ( @{$issue} ) {
+			if ( $oid2attr{ $i->{'type'} } ) {
+				$type = $oid2attr{ $i->{'type'} };
+			} else {
+				$type = $i->{'type'};
+			}
+			my @key = keys( %{ $i->{'value'} } );
+			push @{$issuedn}, $type . "=" . $i->{'value'}->{ $key[0] };
 		}
 	}
 	return $issuedn;
 }
 
 sub _issuer_part {
-	my $self = shift;
-	my $oid = shift;
-	my $issuerrdn=$self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
-	foreach my $issue (@{$issuerrdn}) {
-		foreach my $i (@{$issue}) {
-			if ($i->{'type'} eq $oid) { 
-				my @key= keys (%{$i->{'value'}});
-				return $i->{'value'}->{$key[0]};
-			 }
+	my $self      = shift;
+	my $oid       = shift;
+	my $issuerrdn = $self->{'tbsCertificate'}->{'issuer'}->{'rdnSequence'};
+	foreach my $issue ( @{$issuerrdn} ) {
+		foreach my $i ( @{$issue} ) {
+			if ( $i->{'type'} eq $oid ) {
+				my @key = keys( %{ $i->{'value'} } );
+				return $i->{'value'}->{ $key[0] };
+			}
 		}
 	}
 	return undef;
@@ -536,9 +518,8 @@ Only the first entry is returned. C<undef> if issuer contains no common name att
 
 sub issuer_cn {
 	my $self = shift;
-	return _issuer_part($self,'2.5.4.3');
+	return _issuer_part( $self, '2.5.4.3' );
 }
-
 
 =head2 issuer_country 
 
@@ -550,7 +531,7 @@ Only the first entry is returned. C<undef> if issuer contains no country attribu
 
 sub issuer_country {
 	my $self = shift;
-	return _issuer_part($self,'2.5.4.6');
+	return _issuer_part( $self, '2.5.4.6' );
 }
 
 =head2 issuer_state
@@ -563,7 +544,7 @@ Only the first entry is returned. C<undef> if issuer contains no state attribute
 
 sub issuer_state {
 	my $self = shift;
-	return _issuer_part($self,'2.5.4.8');
+	return _issuer_part( $self, '2.5.4.8' );
 }
 
 =head2 issuer_locality
@@ -576,7 +557,7 @@ Only the first entry is returned. C<undef> if issuer contains no locality attrib
 
 sub issuer_locality {
 	my $self = shift;
-	return _issuer_part($self,'2.5.4.7');
+	return _issuer_part( $self, '2.5.4.7' );
 }
 
 =head2 issuer_org
@@ -589,7 +570,7 @@ Only the first entry is returned. C<undef> if issuer contains no organization at
 
 sub issuer_org {
 	my $self = shift;
-	return _issuer_part($self,'2.5.4.10');
+	return _issuer_part( $self, '2.5.4.10' );
 }
 
 =head2 issuer_email
@@ -602,10 +583,8 @@ Only the first entry is returned. C<undef> if issuer contains no email attribute
 
 sub issuer_email {
 	my $self = shift;
-	return _issuer_part($self,'1.2.840.113549.1.9.1');
+	return _issuer_part( $self, '1.2.840.113549.1.9.1' );
 }
-
-
 #########################################################################
 # accessors - extensions (automate this)
 #########################################################################
@@ -630,37 +609,83 @@ If the extension is marked critical, this is also reported.
 
 =cut back
 
-
 sub KeyUsage {
-    my $self=shift;
-    my $ext;
-    my $exts=$self->{'tbsCertificate'}->{'extensions'};
-    if (!defined $exts) {return undef;}; # no extensions in certificate
-    foreach $ext (@{$exts}) {
-        if ($ext->{'extnID'} eq '2.5.29.15') { #OID for keyusage
-            my $parsKeyU=_init('KeyUsage'); # get a parser for this
-            my $keyusage=$parsKeyU->decode($ext->{'extnValue'}); # decode the value
-            if ($parsKeyU->error) {
-                $self->{"_error"} = $parsKeyU->error;
-                return undef;
-            }
-            my $keyu= unpack("S",${$keyusage}[0].${$keyusage}[1]) & 511 ;
-            $ext->{'usage'}= [];
-	    if ($ext->{'critical'}) {push @{$ext->{'usage'}}, "critical";} # mark as critical, if appropriate
-            if ($keyu & 128) {push @{$ext->{'usage'}}, "digitalSignature";}
-            if ($keyu & 64) {push @{$ext->{'usage'}}, "nonRepudiation";}
-            if ($keyu & 32) {push @{$ext->{'usage'}}, "keyEncipherment";}
-            if ($keyu & 16) {push @{$ext->{'usage'}}, "dataEncipherment";}
-            if ($keyu & 8) {push @{$ext->{'usage'}}, "keyAgreement";}
-            if ($keyu & 4) {push @{$ext->{'usage'}}, "keyCertSign";}
-            if ($keyu & 2) {push @{$ext->{'usage'}}, "cRLSign";}
-            if ($keyu & 1) {push @{$ext->{'usage'}}, "encipherOnly";}
-            #if ($keyu & 256) {push @{$ext->{'usage'}}, "decipherOnly";}
+	my $self = shift;
+	my $ext;
+	my $exts = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $exts ) { return undef; }
+	;    # no extensions in certificate
+	foreach $ext ( @{$exts} ) {
+		if ( $ext->{'extnID'} eq '2.5.29.15' ) {    #OID for keyusage
+			my $parsKeyU = _init('KeyUsage');                           # get a parser for this
+			my $keyusage = $parsKeyU->decode( $ext->{'extnValue'} );    # decode the value
+			if ( $parsKeyU->error ) {
+				$self->{"_error"} = $parsKeyU->error;
+				return undef;
+			}
+			my $keyu = unpack( "n", ${$keyusage}[0] . ${$keyusage}[1] ) & 0xff80;
+			$ext->{'usage'} = [];
+			if ( $ext->{'critical'} ) { push @{ $ext->{'usage'} }, "critical"; }           # mark as critical, if appropriate
+			if ( $keyu & 0x8000 )     { push @{ $ext->{'usage'} }, "digitalSignature"; }
+			if ( $keyu & 0x4000 )     { push @{ $ext->{'usage'} }, "nonRepudiation"; }
+			if ( $keyu & 0x2000 )     { push @{ $ext->{'usage'} }, "keyEncipherment"; }
+			if ( $keyu & 0x1000 )     { push @{ $ext->{'usage'} }, "dataEncipherment"; }
+			if ( $keyu & 0x0800 )     { push @{ $ext->{'usage'} }, "keyAgreement"; }
+			if ( $keyu & 0x0400 )     { push @{ $ext->{'usage'} }, "keyCertSign"; }
+			if ( $keyu & 0x0200 )     { push @{ $ext->{'usage'} }, "cRLSign"; }
+			if ( $keyu & 0x0100 )     { push @{ $ext->{'usage'} }, "encipherOnly"; }
+			if ( $keyu & 0x0080 )     { push @{ $ext->{'usage'} }, "decipherOnly"; }
+			return $ext->{'usage'};
+		}
+	}
+	return undef;                                                                          # keyusage extension not found
+}
 
-            return $ext->{'usage'};
-        }
-    }
-    return undef; # keyusage extension not found
+=head2 ExtKeyUsage
+
+returns a pointer to an array of ExtKeyUsage strings (or OIDs for unknown OIDs) or
+C<undef> if the extension is not filled. OIDs of the following ExtKeyUsages are known: 
+serverAuth, clientAuth, codeSigning, emailProtection, timeStamping, OCSPSigning
+
+If the extension is marked critical, this is also reported.
+
+  $decoded= Crypt::X509->new($cert);
+  print "ExtKeyUsage extension of this Certificates is: ", join(", ", @{$decoded->ExtKeyUsage}), "\n";
+  
+  Example Output: ExtKeyUsage extension of this Certificates is: critical, serverAuth
+
+=cut back
+
+my %oid2extkeyusage = (
+						'1.3.6.1.5.5.7.3.1' => 'serverAuth',
+						'1.3.6.1.5.5.7.3.2' => 'clientAuth',
+						'1.3.6.1.5.5.7.3.3' => 'codeSigning',
+						'1.3.6.1.5.5.7.3.4' => 'emailProtection',
+						'1.3.6.1.5.5.7.3.8' => 'timeStamping',
+						'1.3.6.1.5.5.7.3.9' => 'OCSPSigning',
+);
+
+sub ExtKeyUsage {
+	my $self = shift;
+	my $ext;
+	my $exts = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $exts ) { return undef; }
+	;    # no extensions in certificate
+	foreach $ext ( @{$exts} ) {
+		if ( $ext->{'extnID'} eq '2.5.29.37' ) {    #OID for ExtKeyUsage
+			return $ext->{'oids'} if defined $ext->{'oids'};
+			my $parsExtKeyUsage = _init('ExtKeyUsageSyntax');                         # get a parser for this
+			my $oids            = $parsExtKeyUsage->decode( $ext->{'extnValue'} );    # decode the value
+			if ( $parsExtKeyUsage->error ) {
+				$self->{"_error"} = $parsExtKeyUsage->error;
+				return undef;
+			}
+			$ext->{'oids'} = [ map { $oid2extkeyusage{$_} || $_ } @$oids ];
+			if ( $ext->{'critical'} ) { unshift @{ $ext->{'oids'} }, "critical"; }    # mark as critical, if appropriate
+			return $ext->{'oids'};
+		}
+	}
+	return undef;
 }
 
 =head2 SubjectAltName
@@ -679,54 +704,54 @@ It also pre-pends the field type (ie rfc822Name) to the returned value.
 =cut back
 
 sub SubjectAltName {
-    my $self=shift;
-    my $ext;
-    my $exts=$self->{'tbsCertificate'}->{'extensions'};
-    if (!defined $exts) {return undef;}; # no extensions in certificate
-    foreach $ext (@{$exts}) {
-        if ($ext->{'extnID'} eq '2.5.29.17') { #OID for SubjectAltName
-            my $parsSubjAlt=_init('SubjectAltName'); # get a parser for this
-            my $altnames=$parsSubjAlt->decode($ext->{'extnValue'}); # decode the value
-            if ($parsSubjAlt->error) {
-                $self->{"_error"} = $parsSubjAlt->error;
-                return undef;
-                }
-            $ext->{'names'}= [];
-            foreach my $name (@{$altnames}) {
-                foreach my $value (keys %{$name}) {
-                    push @{$ext->{'names'}}, "$value=" . $name->{$value};
-                    }
-                }
-            return $ext->{'names'};
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $ext;
+	my $exts = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $exts ) { return undef; }
+	;    # no extensions in certificate
+	foreach $ext ( @{$exts} ) {
+		if ( $ext->{'extnID'} eq '2.5.29.17' ) {    #OID for SubjectAltName
+			my $parsSubjAlt = _init('SubjectAltName');                        # get a parser for this
+			my $altnames    = $parsSubjAlt->decode( $ext->{'extnValue'} );    # decode the value
+			if ( $parsSubjAlt->error ) {
+				$self->{"_error"} = $parsSubjAlt->error;
+				return undef;
+			}
+			$ext->{'names'} = [];
+			foreach my $name ( @{$altnames} ) {
+				foreach my $value ( keys %{$name} ) {
+					push @{ $ext->{'names'} }, "$value=" . $name->{$value};
+				}
+			}
+			return $ext->{'names'};
+		}
+	}
+	return undef;
 }
-
 #########################################################################
 # accessors - authorityCertIssuer
 #########################################################################
-
 sub _AuthorityKeyIdentifier {
-    my $self=shift;
-    my $ext;
-    my $exts=$self->{'tbsCertificate'}->{'extensions'};
-    if (!defined $exts) {return undef;}; # no extensions in certificate
-	if (defined $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'}) {
-		return ($self->{'tbsCertificate'}{'AuthorityKeyIdentifier'});
+	my $self = shift;
+	my $ext;
+	my $exts = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $exts ) { return undef; }
+	;    # no extensions in certificate
+	if ( defined $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'} ) {
+		return ( $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'} );
 	}
-	foreach $ext (@{$exts}) {
-        if ($ext->{'extnID'} eq '2.5.29.35') { #OID for AuthorityKeyIdentifier
-            my $pars=_init('AuthorityKeyIdentifier'); # get a parser for this
-            $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'}=$pars->decode($ext->{'extnValue'}); # decode the value
-            if ($pars->error) {
-                $self->{"_error"} = $pars->error;
-                return undef;
-            }
-            return $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'};
-        }
-    }
-    return undef;
+	foreach $ext ( @{$exts} ) {
+		if ( $ext->{'extnID'} eq '2.5.29.35' ) {    #OID for AuthorityKeyIdentifier
+			my $pars = _init('AuthorityKeyIdentifier');    # get a parser for this
+			$self->{'tbsCertificate'}{'AuthorityKeyIdentifier'} = $pars->decode( $ext->{'extnValue'} );    # decode the value
+			if ( $pars->error ) {
+				$self->{"_error"} = $pars->error;
+				return undef;
+			}
+			return $self->{'tbsCertificate'}{'AuthorityKeyIdentifier'};
+		}
+	}
+	return undef;
 }
 
 =head2 authorityCertIssuer
@@ -742,45 +767,45 @@ undef if the extension is not set in the certificate.
 =cut back
 
 sub authorityCertIssuer {
-	my $self=shift;
-	my ($i,$type);
-	my $rdn=_AuthorityKeyIdentifier($self);
-	if (!defined ($rdn)) {
-		return (undef); # we do not have that extension
+	my $self = shift;
+	my ( $i, $type );
+	my $rdn = _AuthorityKeyIdentifier($self);
+	if ( !defined($rdn) ) {
+		return (undef);    # we do not have that extension
 	} else {
-		$rdn=$rdn->{'authorityCertIssuer'}[0]->{'directoryName'};
+		$rdn = $rdn->{'authorityCertIssuer'}[0]->{'directoryName'};
 	}
-	$rdn->{'dn'} =[];
-        my $dn = $rdn->{'dn'};
+	$rdn->{'dn'} = [];
+	my $dn = $rdn->{'dn'};
 	$rdn = $rdn->{'rdnSequence'};
-	foreach my $r (@{$rdn}) {
-		$i=@{$r}[0];
-		if ($oid2attr{$i->{'type'}}) { 
-			$type = $oid2attr{$i->{'type'}};
-		 } else {
-            $type = $i->{'type'};
-        };
-		my @key= keys (%{$i->{'value'}});
-		push @{$dn},$type."=".$i->{'value'}->{$key[0]};
+	foreach my $r ( @{$rdn} ) {
+		$i = @{$r}[0];
+		if ( $oid2attr{ $i->{'type'} } ) {
+			$type = $oid2attr{ $i->{'type'} };
+		} else {
+			$type = $i->{'type'};
+		}
+		my @key = keys( %{ $i->{'value'} } );
+		push @{$dn}, $type . "=" . $i->{'value'}->{ $key[0] };
 	}
 	return $dn;
 }
 
 sub _authcert_part {
 	my $self = shift;
-	my $oid = shift;
-	my $rdn=_AuthorityKeyIdentifier($self);
-	if (!defined ($rdn)) {
-		return (undef); # we do not have that extension
+	my $oid  = shift;
+	my $rdn  = _AuthorityKeyIdentifier($self);
+	if ( !defined($rdn) ) {
+		return (undef);    # we do not have that extension
 	} else {
-		$rdn=$rdn->{'authorityCertIssuer'}[0]->{'directoryName'}->{'rdnSequence'};
+		$rdn = $rdn->{'authorityCertIssuer'}[0]->{'directoryName'}->{'rdnSequence'};
 	}
-	foreach my $r (@{$rdn}) {
+	foreach my $r ( @{$rdn} ) {
 		my $i = @{$r}[0];
-		if ($i->{'type'} eq $oid) { 
-			my @key= keys (%{$i->{'value'}});
-			return $i->{'value'}->{$key[0]};
-		 }
+		if ( $i->{'type'} eq $oid ) {
+			my @key = keys( %{ $i->{'value'} } );
+			return $i->{'value'}->{ $key[0] };
+		}
 	}
 	return undef;
 }
@@ -793,9 +818,8 @@ Returns the authority's certificate serial number.
 
 sub authority_serial {
 	my $self = shift;
-    return ($self->_AuthorityKeyIdentifier)->{authorityCertSerialNumber};
+	return ( $self->_AuthorityKeyIdentifier )->{authorityCertSerialNumber};
 }
-
 
 =head2 key_identifier
 
@@ -805,7 +829,7 @@ Returns the authority key identifier or undef if it is a rooted cert
 
 sub key_identifier {
 	my $self = shift;
-	if ( defined $self->_AuthorityKeyIdentifier ) { return ($self->_AuthorityKeyIdentifier)->{keyIdentifier}; }
+	if ( defined $self->_AuthorityKeyIdentifier ) { return ( $self->_AuthorityKeyIdentifier )->{keyIdentifier}; }
 	return undef;
 }
 
@@ -817,9 +841,8 @@ Returns the authority's ca.
 
 sub authority_cn {
 	my $self = shift;
-	return _authcert_part($self,'2.5.4.3');
+	return _authcert_part( $self, '2.5.4.3' );
 }
-
 
 =head2 authority_country
 
@@ -829,7 +852,7 @@ Returns the authority's country.
 
 sub authority_country {
 	my $self = shift;
-	return _authcert_part($self,'2.5.4.6');
+	return _authcert_part( $self, '2.5.4.6' );
 }
 
 =head2 authority_state
@@ -840,8 +863,7 @@ Returns the authority's state.
 
 sub authority_state {
 	my $self = shift;
-	return _authcert_part($self,'2.5.4.8');
-
+	return _authcert_part( $self, '2.5.4.8' );
 }
 
 =head2 authority_locality
@@ -852,7 +874,7 @@ Returns the authority's locality.
 
 sub authority_locality {
 	my $self = shift;
-	return _authcert_part($self,'2.5.4.7');
+	return _authcert_part( $self, '2.5.4.7' );
 }
 
 =head2 authority_org
@@ -863,7 +885,7 @@ Returns the authority's organization.
 
 sub authority_org {
 	my $self = shift;
-	return _authcert_part($self,'2.5.4.10');
+	return _authcert_part( $self, '2.5.4.10' );
 }
 
 =head2 authority_email
@@ -874,7 +896,7 @@ Returns the authority's email.
 
 sub authority_email {
 	my $self = shift;
-	return _authcert_part($self,'1.2.840.113549.1.9.1');
+	return _authcert_part( $self, '1.2.840.113549.1.9.1' );
 }
 
 =head2 CRLDistributionPoints
@@ -884,26 +906,27 @@ Returns the CRL distribution points as an array of strings (with one value usual
 =cut back
 
 sub CRLDistributionPoints {
-    my $self=shift;
-    my $ext;
-    my $exts=$self->{'tbsCertificate'}->{'extensions'};
-    if (!defined $exts) {return undef;}; # no extensions in certificate
-    foreach $ext (@{$exts}) {
-        if ($ext->{'extnID'} eq '2.5.29.31') { #OID for cRLDistributionPoints
-            my $crlp=_init('cRLDistributionPoints'); # get a parser for this
-            my $points=$crlp->decode($ext->{'extnValue'}); # decode the value
-            $points=$points->[0]->{'distributionPoint'}->{'fullName'};
-            if ($crlp->error) {
-                $self->{"_error"} = $crlp->error;
-                return undef;
-                }
-            foreach my $name (@{$points}) {
-               push @{$ext->{'crlpoints'}}, $name->{'uniformResourceIdentifier'};
-            }
-            return $ext->{'crlpoints'};
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $ext;
+	my $exts = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $exts ) { return undef; }
+	;    # no extensions in certificate
+	foreach $ext ( @{$exts} ) {
+		if ( $ext->{'extnID'} eq '2.5.29.31' ) {    #OID for cRLDistributionPoints
+			my $crlp   = _init('cRLDistributionPoints');          # get a parser for this
+			my $points = $crlp->decode( $ext->{'extnValue'} );    # decode the value
+			$points = $points->[0]->{'distributionPoint'}->{'fullName'};
+			if ( $crlp->error ) {
+				$self->{"_error"} = $crlp->error;
+				return undef;
+			}
+			foreach my $name ( @{$points} ) {
+				push @{ $ext->{'crlpoints'} }, $name->{'uniformResourceIdentifier'};
+			}
+			return $ext->{'crlpoints'};
+		}
+	}
+	return undef;
 }
 
 =head2 CRLDistributionPoints2
@@ -914,50 +937,55 @@ Returns the CRL distribution points as an array of hashes (allowing for some var
 
 # newer CRL
 sub CRLDistributionPoints2 {
-    my $self = shift;
-    my %CDPs;
-    my $dp_cnt = 0; # this is a counter used to show which CDP a particular value is listed in
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for my $extension ( @{ $extensions } ) {
-    	if ( $extension->{'extnID'} eq '2.5.29.31' ) { # OID for ARRAY of cRLDistributionPoints
-    	    my $parser = _init('cRLDistributionPoints'); # get a parser for CDPs
-    	    my $points = $parser->decode( $extension->{'extnValue'} ); # decode the values (returns an array)
-    	    for my $each_dp ( @{ $points } ) { # this loops through multiple "distributionPoint" values
-    	        $dp_cnt++;
-    	        for my $each_fullName ( @{ $each_dp->{'distributionPoint'}->{'fullName'} } ) { # this loops through multiple "fullName" values
-    	            if ( exists $each_fullName->{directoryName} ) {
-                        # found a rdnSequence
-                        my $rdn = join ',' , reverse @{ my_CRL_rdn( $each_fullName->{directoryName}->{rdnSequence} ) };
-                        push @{ $CDPs{$dp_cnt} }, "Directory Address: $rdn";
-                    } elsif ( exists $each_fullName->{uniformResourceIdentifier} ) {
-                        # found a URI
-                        push @{ $CDPs{$dp_cnt} }, "URL: " . $each_fullName->{uniformResourceIdentifier};
-                    } else {
-                        # found some other type of CDP value
-                        # return undef;
-                    }
-	    	}
-	    }
-	    return %CDPs;
+	my $self = shift;
+	my %CDPs;
+	my $dp_cnt = 0;    # this is a counter used to show which CDP a particular value is listed in
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;                  # no extensions in certificate
+	for my $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '2.5.29.31' ) {    # OID for ARRAY of cRLDistributionPoints
+			my $parser = _init('cRLDistributionPoints');                  # get a parser for CDPs
+			my $points = $parser->decode( $extension->{'extnValue'} );    # decode the values (returns an array)
+			for my $each_dp ( @{$points} ) {                              # this loops through multiple "distributionPoint" values
+				$dp_cnt++;
+				for my $each_fullName ( @{ $each_dp->{'distributionPoint'}->{'fullName'} } )
+				{                                                         # this loops through multiple "fullName" values
+					if ( exists $each_fullName->{directoryName} ) {
+
+						# found a rdnSequence
+						my $rdn = join ',', reverse @{ my_CRL_rdn( $each_fullName->{directoryName}->{rdnSequence} ) };
+						push @{ $CDPs{$dp_cnt} }, "Directory Address: $rdn";
+					} elsif ( exists $each_fullName->{uniformResourceIdentifier} ) {
+
+						# found a URI
+						push @{ $CDPs{$dp_cnt} }, "URL: " . $each_fullName->{uniformResourceIdentifier};
+					} else {
+
+						# found some other type of CDP value
+						# return undef;
+					}
+				}
+			}
+			return %CDPs;
+		}
 	}
-    }
-    return undef;
+	return undef;
 }
 
 sub my_CRL_rdn {
-	my $crl_rdn = shift; # this should be the passed in 'rdnSequence' array
-	my ( $i ,$type );
-	my $crl_dn = []; 
+	my $crl_rdn = shift;    # this should be the passed in 'rdnSequence' array
+	my ( $i, $type );
+	my $crl_dn = [];
 	for my $part ( @{$crl_rdn} ) {
 		$i = @{$part}[0];
-		if ( $oid2attr{ $i->{'type'} } ) { 
+		if ( $oid2attr{ $i->{'type'} } ) {
 			$type = $oid2attr{ $i->{'type'} };
-		 } else {
-            		$type = $i->{'type'};
-        	 }
-		my @key = keys ( %{ $i->{'value'} } );
-		push @{ $crl_dn } , $type . "=" . $i->{'value'}->{ $key[0] };
+		} else {
+			$type = $i->{'type'};
+		}
+		my @key = keys( %{ $i->{'value'} } );
+		push @{$crl_dn}, $type . "=" . $i->{'value'}->{ $key[0] };
 	}
 	return $crl_dn;
 }
@@ -970,24 +998,25 @@ Returns the CertificatePolicies as an array of strings
 
 # CertificatePolicies (another extension)
 sub CertificatePolicies {
-    my $self = shift;
-    my $extension;
-    my $CertPolicies = [];
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '2.5.29.32' ) { # OID for CertificatePolicies
-            my $parser = _init('CertificatePolicies'); # get a parser for this
-            my $policies = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            for my $policy ( @{ $policies } ) {
-                for my $key ( keys %{ $policy } ) {
-                    push @{ $CertPolicies } , "$key=" . $policy->{$key};
-                }
-            }
-            return $CertPolicies;
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $extension;
+	my $CertPolicies = [];
+	my $extensions   = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '2.5.29.32' ) {    # OID for CertificatePolicies
+			my $parser   = _init('CertificatePolicies');                    # get a parser for this
+			my $policies = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			for my $policy ( @{$policies} ) {
+				for my $key ( keys %{$policy} ) {
+					push @{$CertPolicies}, "$key=" . $policy->{$key};
+				}
+			}
+			return $CertPolicies;
+		}
+	}
+	return undef;
 }
 
 =head2 EntrustVersionInfo
@@ -1002,20 +1031,22 @@ Returns the EntrustVersion as a string
 
 # EntrustVersion (another extension)
 sub EntrustVersion {
-    my $self = shift;
-    my $extension;
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '1.2.840.113533.7.65.0' ) { # OID for EntrustVersionInfo
-            my $parser = _init('EntrustVersionInfo'); # get a parser for this
-            my $entrust = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            return $entrust->{'entrustVers'};
-            # not doing anything with the EntrustInfoFlags BIT STRING (yet)
-            # $entrust->{'entrustInfoFlags'}
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $extension;
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '1.2.840.113533.7.65.0' ) {    # OID for EntrustVersionInfo
+			my $parser  = _init('EntrustVersionInfo');                     # get a parser for this
+			my $entrust = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			return $entrust->{'entrustVers'};
+
+			# not doing anything with the EntrustInfoFlags BIT STRING (yet)
+			# $entrust->{'entrustInfoFlags'}
+		}
+	}
+	return undef;
 }
 
 =head2 SubjectDirectoryAttributes
@@ -1030,26 +1061,27 @@ Returns the SubjectDirectoryAttributes as an array of key = value pairs, to incl
 
 # SubjectDirectoryAttributes (another extension)
 sub SubjectDirectoryAttributes {
-    my $self = shift;
-    my $extension;
-    my $attributes = [];
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '2.5.29.9' ) { # OID for SubjectDirectoryAttributes
-            my $parser = _init('SubjectDirectoryAttributes'); # get a parser for this
-            my $subject_dir_attrs = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            for my $type ( @{ $subject_dir_attrs } ) {
-                for my $value ( @{ $type->{'values'} } ) {
-                    for my $key ( keys %{ $value } ) {
-                        push @{ $attributes } , $type->{'type'} . " = " . $value->{$key} . " ($key)";
-                    }
-                }
-            }
-            return $attributes;
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $extension;
+	my $attributes = [];
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '2.5.29.9' ) {    # OID for SubjectDirectoryAttributes
+			my $parser            = _init('SubjectDirectoryAttributes');             # get a parser for this
+			my $subject_dir_attrs = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			for my $type ( @{$subject_dir_attrs} ) {
+				for my $value ( @{ $type->{'values'} } ) {
+					for my $key ( keys %{$value} ) {
+						push @{$attributes}, $type->{'type'} . " = " . $value->{$key} . " ($key)";
+					}
+				}
+			}
+			return $attributes;
+		}
+	}
+	return undef;
 }
 
 =head2 BasicConstraints
@@ -1060,23 +1092,24 @@ Returns the BasicConstraints as an array and the criticallity pre-pended.
 
 # BasicConstraints (another extension)
 sub BasicConstraints {
-    my $self = shift;
-    my $extension;
-    my $constraints = [];
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '2.5.29.19' ) { # OID for BasicConstraints
-            if ( $extension->{'critical'} ) { push @{ $constraints } , "critical"; } # mark this as critical as appropriate
-            my $parser = _init('BasicConstraints'); # get a parser for this
-            my $basic_constraints = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            for my $key ( keys %{ $basic_constraints } ) {
-                push @{ $constraints } , "$key = " . $basic_constraints->{$key};
-            }
-            return $constraints;
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $extension;
+	my $constraints = [];
+	my $extensions  = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '2.5.29.19' ) {    # OID for BasicConstraints
+			if ( $extension->{'critical'} ) { push @{$constraints}, "critical"; }    # mark this as critical as appropriate
+			my $parser            = _init('BasicConstraints');                       # get a parser for this
+			my $basic_constraints = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			for my $key ( keys %{$basic_constraints} ) {
+				push @{$constraints}, "$key = " . $basic_constraints->{$key};
+			}
+			return $constraints;
+		}
+	}
+	return undef;
 }
 
 =head2 subject_keyidentifier
@@ -1093,24 +1126,25 @@ sub subject_keyidentifier {
 
 # _SubjectKeyIdentifier (another extension)
 sub _SubjectKeyIdentifier {
-    my $self = shift;
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) {return undef;}; # no extensions in certificate
-        if ( defined $self->{'tbsCertificate'}{'SubjectKeyIdentifier'} ) {
-            return ( $self->{'tbsCertificate'}{'SubjectKeyIdentifier'} );
-        }
-        for my $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '2.5.29.14' ) { # OID for SubjectKeyIdentifier
-            my $parser = _init('SubjectKeyIdentifier'); # get a parser for this
-            $self->{'tbsCertificate'}{'SubjectKeyIdentifier'} = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            if ( $parser->error ) {
-                $self->{"_error"} = $parser->error;
-                return undef;
-            }
-            return $self->{'tbsCertificate'}{'SubjectKeyIdentifier'};
-        }
-    }
-    return undef;
+	my $self       = shift;
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	if ( defined $self->{'tbsCertificate'}{'SubjectKeyIdentifier'} ) {
+		return ( $self->{'tbsCertificate'}{'SubjectKeyIdentifier'} );
+	}
+	for my $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '2.5.29.14' ) {    # OID for SubjectKeyIdentifier
+			my $parser = _init('SubjectKeyIdentifier');    # get a parser for this
+			$self->{'tbsCertificate'}{'SubjectKeyIdentifier'} = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			if ( $parser->error ) {
+				$self->{"_error"} = $parser->error;
+				return undef;
+			}
+			return $self->{'tbsCertificate'}{'SubjectKeyIdentifier'};
+		}
+	}
+	return undef;
 }
 
 =head2 SubjectInfoAccess
@@ -1136,36 +1170,35 @@ Returns the SubjectInfoAccess as an array of hashes with key=value pairs.
 
 # SubjectInfoAccess (another extension)
 sub SubjectInfoAccess {
-    my $self = shift;
-    my $extension;
-    my %SIA;
-    my $extensions = $self->{'tbsCertificate'}->{'extensions'};
-    if ( !defined $extensions ) { return undef; }; # no extensions in certificate
-    for $extension ( @{ $extensions } ) {
-        if ( $extension->{'extnID'} eq '1.3.6.1.5.5.7.1.11' ) { # OID for SubjectInfoAccess
-            my $parser = _init('SubjectInfoAccessSyntax'); # get a parser for this
-            my $subject_info_access = $parser->decode( $extension->{'extnValue'} ); # decode the value
-            for my $sia ( @{ $subject_info_access } ) {
-            	for my $key ( keys %{ $sia->{'accessLocation'} } ) {
-              	    push @{ $SIA{ $sia->{'accessMethod'} } } , "$key = " . $sia->{'accessLocation'}{$key};
-	        }
-            }
-            return %SIA;
-        }
-    }
-    return undef;
+	my $self = shift;
+	my $extension;
+	my %SIA;
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '1.3.6.1.5.5.7.1.11' ) {    # OID for SubjectInfoAccess
+			my $parser              = _init('SubjectInfoAccessSyntax');                # get a parser for this
+			my $subject_info_access = $parser->decode( $extension->{'extnValue'} );    # decode the value
+			for my $sia ( @{$subject_info_access} ) {
+				for my $key ( keys %{ $sia->{'accessLocation'} } ) {
+					push @{ $SIA{ $sia->{'accessMethod'} } }, "$key = " . $sia->{'accessLocation'}{$key};
+				}
+			}
+			return %SIA;
+		}
+	}
+	return undef;
 }
-
-
 #######################################################################
 # internal functions
 #######################################################################
 sub _init {
-        my $what  = shift;
-        if ((!defined $what) || ('' eq $what)) {$what='Certificate'};
-		if (!defined $asn) {
-			$asn = Convert::ASN1->new;
-			$asn->prepare(<<ASN1);
+	my $what = shift;
+	if ( ( !defined $what ) || ( '' eq $what ) ) { $what = 'Certificate' }
+	if ( !defined $asn ) {
+		$asn = Convert::ASN1->new;
+		$asn->prepare(<<ASN1);
 -- ASN.1 from RFC2459 and X.509(2001)
 -- Adapted for use with Convert::ASN1
 -- Id: x509decode,v 1.1 2002/02/10 16:41:28 gbarr Exp 
@@ -1270,7 +1303,7 @@ Extension ::= SEQUENCE {
 
 AlgorithmIdentifier ::= SEQUENCE {
 	algorithm		OBJECT IDENTIFIER,
-	parameters		ANY
+	parameters		ANY OPTIONAL
 	}
 
 
@@ -1509,9 +1542,9 @@ AccessDescription  ::=  SEQUENCE {
 SubjectInfoAccessSyntax  ::=
         SEQUENCE OF AccessDescription --SIZE (1..MAX) OF AccessDescription
 ASN1
-        }
-        my $self= $asn->find($what);
-        return $self;
+	}
+	my $self = $asn->find($what);
+	return $self;
 }
 
 =head1 SEE ALSO

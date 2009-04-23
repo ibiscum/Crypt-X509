@@ -1,6 +1,10 @@
 Revision history for Perl extension Crypt::X509.
+0.40 Fri Apr 23 2009 ajung
+	- incorporated patch from Joerg-Cornelius Schneider to access ExtKeyUsage
+	- incorporated patch from Joerg-Cornelius Schneider to fix parsing DSA/ECDSA signed certificates
+	- incorporated patch from Rein Tollevik to fix keyusage parsing on 64bit machines
 
-0.32  Die Jan 09 2007 ajung
+0.32  Tue Jan 09 2007 ajung
 	- fixed problem with not found issuer and subject parts
 	  (found by Michael Steller)
 

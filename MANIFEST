@@ -12,3 +12,4 @@ t/new_root_ca.cer
 t/subca_2.cer
 t/telesec_799972029.crt
 t/verisign.der
+t/dsacert.der
