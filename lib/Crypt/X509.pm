@@ -8,17 +8,21 @@ our @ISA         = qw(Exporter);
 our %EXPORT_TAGS = ( 'all' => [qw()] );
 our @EXPORT_OK   = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT      = qw(error new not_before not_after serial);
-our $VERSION     = '0.40';
+our $VERSION     = '0.50';
 my $parser = undef;
 my $asn    = undef;
 my $error  = undef;
 my %oid2enchash = (
-					'1.2.840.113549.1.1.1' => { 'enc' => 'RSA' },
-					'1.2.840.113549.1.1.2' => { 'enc' => 'RSA', 'hash' => 'MD2' },
-					'1.2.840.113549.1.1.3' => { 'enc' => 'RSA', 'hash' => 'MD4' },
-					'1.2.840.113549.1.1.4' => { 'enc' => 'RSA', 'hash' => 'MD5' },
-					'1.2.840.113549.1.1.5' => { 'enc' => 'RSA', 'hash' => 'SHA1' },
-					'1.2.840.113549.1.1.6' => { 'enc' => 'OAEP' }
+					'1.2.840.113549.1.1.1'  => { 'enc' => 'RSA' },
+					'1.2.840.113549.1.1.2'  => { 'enc' => 'RSA', 'hash' => 'MD2' },
+					'1.2.840.113549.1.1.3'  => { 'enc' => 'RSA', 'hash' => 'MD4' },
+					'1.2.840.113549.1.1.4'  => { 'enc' => 'RSA', 'hash' => 'MD5' },
+					'1.2.840.113549.1.1.5'  => { 'enc' => 'RSA', 'hash' => 'SHA1' },
+					'1.2.840.113549.1.1.6'  => { 'enc' => 'OAEP' },
+					'1.2.840.113549.1.1.11' => { 'enc' => 'RSA', 'hash' => 'SHA256' },
+					'1.2.840.113549.1.1.12' => { 'enc' => 'RSA', 'hash' => 'SHA384' },
+					'1.2.840.113549.1.1.13' => { 'enc' => 'RSA', 'hash' => 'SHA512' },
+					'1.2.840.113549.1.1.14' => { 'enc' => 'RSA', 'hash' => 'SHA224' }
 );
 my %oid2attr = (
 				 "2.5.4.3"                    => "CN",
@@ -89,7 +93,7 @@ LDAP-directory).
 
 sub new {
 	my ( $class, %args ) = @_;
-	if ( !defined($parser) ) {
+	if ( !defined($parser) || $parser->error ) {
 		$parser = _init();
 	}
 	my $self = $parser->decode( $args{'cert'} );
@@ -284,6 +288,27 @@ sub PubKeyAlg {
 	return $oid2enchash{ $self->{tbsCertificate}{subjectPublicKeyInfo}{algorithm}{algorithm} }->{'enc'};
 }
 
+=head2 pubkey_components
+
+If this certificate contains an RSA key, this function returns a
+hashref { modulus => $m, exponent => $e) from that key; each value in
+the hash will be an integer scalar or a Math::BigInt object.
+
+For other pubkey types, it returns undef (implementations welcome!).
+
+=cut back
+
+sub pubkey_components {
+	my $self = shift;
+        if ($self->PubKeyAlg() eq 'RSA') {
+          my $parser = _init('RSAPubKeyInfo');
+          my $values = $parser->decode($self->{tbsCertificate}{subjectPublicKeyInfo}{subjectPublicKey}[0]);
+          return $values;
+        } else {
+          return undef;
+        }
+}
+
 =head2 sig_algorithm
 
 Returns the certificate's signature algorithm as OID string
@@ -345,7 +370,6 @@ from the OID-Numbers, unknown numbers are output verbatim.
   print "DN for this Certificate is:".join(',',@{$decoded->Subject})."\n";
 
 =cut back
-
 sub Subject {
 	my $self = shift;
 	my ( $i, $type );
@@ -392,6 +416,19 @@ Only the first entry is returned. C<undef> if subject contains no country attrib
 sub subject_country {
 	my $self = shift;
 	return _subject_part( $self, '2.5.4.6' );
+}
+
+=head2 subject_locality
+
+Returns the string value for subject's locality (= the value with the
+OID 2.5.4.7 or in DN Syntax everything after C<l=>).
+Only the first entry is returned. C<undef> if subject contains no locality attribute.
+
+=cut back
+
+sub subject_locality {
+       my $self = shift;
+       return _subject_part( $self, '2.5.4.7' );
 }
 
 =head2 subject_state
@@ -472,7 +509,6 @@ are translated from the OID-Numbers, unknown numbers are output verbatim.
   print "Certificate was issued by:".join(',',@{$decoded->Issuer})."\n";
 
 =cut back
-
 sub Issuer {
 	my $self = shift;
 	my ( $i, $type );
@@ -608,7 +644,6 @@ If the extension is marked critical, this is also reported.
   dataEncipherment
 
 =cut back
-
 sub KeyUsage {
 	my $self = shift;
 	my $ext;
@@ -638,7 +673,7 @@ sub KeyUsage {
 			return $ext->{'usage'};
 		}
 	}
-	return undef;                                                                          # keyusage extension not found
+	return undef;    # keyusage extension not found
 }
 
 =head2 ExtKeyUsage
@@ -655,7 +690,6 @@ If the extension is marked critical, this is also reported.
   Example Output: ExtKeyUsage extension of this Certificates is: critical, serverAuth
 
 =cut back
-
 my %oid2extkeyusage = (
 						'1.3.6.1.5.5.7.3.1' => 'serverAuth',
 						'1.3.6.1.5.5.7.3.2' => 'clientAuth',
@@ -1190,6 +1224,49 @@ sub SubjectInfoAccess {
 	}
 	return undef;
 }
+
+
+=head2 PGPExtension
+
+Returns the creation timestamp of the corresponding OpenPGP key.
+(see http://www.imc.org/ietf-openpgp/mail-archive/msg05320.html)
+
+		print "PGPExtension: ";
+		if ( defined $decoded->PGPExtension ) {
+			my $creationtime = $decoded->PGPExtension;
+			printf "\n\tcorresponding OpenPGP Creation Time: ", $creationtime, "\n";
+                }
+
+	Example Output:
+		PGPExtension:
+                    whatever
+
+=cut back
+
+# PGPExtension (another extension)
+sub PGPExtension {
+	my $self = shift;
+	my $extension;
+	my $extensions = $self->{'tbsCertificate'}->{'extensions'};
+	if ( !defined $extensions ) { return undef; }
+	;    # no extensions in certificate
+	for $extension ( @{$extensions} ) {
+		if ( $extension->{'extnID'} eq '1.3.6.1.4.1.3401.8.1.1' ) {    # OID for PGPExtension
+			my $parser              = _init('PGPExtension');                # get a parser for this
+			my $pgpextension = $parser->decode( $extension->{'extnValue'} );    # decode the value
+                        if ($pgpextension->{version} != 0) {
+                          $self->{"_error"} = sprintf("got PGPExtension version %d. We only know how to deal with v1 (0)", $pgpextension->{version});
+                        } else {
+                          foreach my $timetype ('generalTime', 'utcTime') {
+                            return $pgpextension->{keyCreation}->{$timetype}
+                              if exists $pgpextension->{keyCreation}->{$timetype};
+                          }
+                        }
+		}
+	}
+	return undef;
+}
+
 #######################################################################
 # internal functions
 #######################################################################
@@ -1291,6 +1368,12 @@ UniqueIdentifier ::= BIT STRING
 SubjectPublicKeyInfo ::= SEQUENCE {
 	algorithm		AlgorithmIdentifier,
 	subjectPublicKey	BIT STRING
+	}
+
+
+RSAPubKeyInfo ::=   SEQUENCE {
+	modulus INTEGER,
+	exponent INTEGER
 	}
 
 Extensions ::= SEQUENCE OF Extension  --SIZE (1..MAX) OF Extension
@@ -1523,7 +1606,6 @@ KeyPurposeId ::= OBJECT IDENTIFIER
 -- id-kp-ipsecUser       OBJECT IDENTIFIER ::= { id-kp 7 }
 -- id-kp-timeStamping    OBJECT IDENTIFIER ::= { id-kp 8 }
 
-
 -- authority info access
 
 -- id-pe-authorityInfoAccess OBJECT IDENTIFIER ::= { id-pe 1 }
@@ -1541,6 +1623,13 @@ AccessDescription  ::=  SEQUENCE {
 
 SubjectInfoAccessSyntax  ::=
         SEQUENCE OF AccessDescription --SIZE (1..MAX) OF AccessDescription
+
+-- pgp creation time
+
+PGPExtension ::= SEQUENCE {
+       version             Version, -- DEFAULT v1(0)
+       keyCreation         Time
+}
 ASN1
 	}
 	my $self = $asn->find($what);
@@ -1572,6 +1661,5 @@ All rights reserved. This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 =cut
-
 1;
 __END__

@@ -1,4 +1,12 @@
 Revision history for Perl extension Crypt::X509.
+
+0.50 Fri Jan 07 2011 ajung
+	- incorporated patch from Tom Harrison to keep working, even after loading a unparsable Cert
+	- incorporated patch from Milan Kocian to access the location Attribute in the Subject DN
+	- incorporated patch from Daniel Kahn Gillmor to parse the names of digests in the SHA-2 family
+	- incorporated patch from Daniel Kahn Gillmor to parse/return PGPExtension (keyCreation time)
+	- incorporated patch from Daniel Kahn Gillmor to implement the request from Toby Inkster to return public key exponent
+
 0.40 Fri Apr 23 2009 ajung
 	- incorporated patch from Joerg-Cornelius Schneider to access ExtKeyUsage
 	- incorporated patch from Joerg-Cornelius Schneider to fix parsing DSA/ECDSA signed certificates

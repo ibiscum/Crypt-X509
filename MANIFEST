@@ -13,3 +13,4 @@ t/subca_2.cer
 t/telesec_799972029.crt
 t/verisign.der
 t/dsacert.der
+t/pgpextension.der
