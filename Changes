@@ -1,5 +1,8 @@
 Revision history for Perl extension Crypt::X509.
 
+0.51 Wed Jul 06 2011 ajung
+    - removed the explicit exports of new() and error() not needed and pollute namespace (thanks for the notice to Daniel Kahn Gillmor)
+
 0.50 Fri Jan 07 2011 ajung
 	- incorporated patch from Tom Harrison to keep working, even after loading a unparsable Cert
 	- incorporated patch from Milan Kocian to access the location Attribute in the Subject DN

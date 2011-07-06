@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Crypt-X509
-version:            0.50
+version:            0.51
 abstract:           Parse a X.509 certificate
 author:
     - Mike Jackson, Alexander Jung, Duncan Segrest
