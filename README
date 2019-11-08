@@ -17,3 +17,8 @@ DEPENDENCIES
 This module requires:
 
   Convert::ASN1
+
+ISSUES, PULL REQUESTS
+
+Plesae visit [https://github.com/openxpki/Crypt-X509] for issues, pull
+requests, etc.
