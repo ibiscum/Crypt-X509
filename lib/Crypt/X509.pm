@@ -8,11 +8,11 @@ our @ISA         = qw(Exporter);
 our %EXPORT_TAGS = ( 'all' => [qw()] );
 our @EXPORT_OK   = ( @{ $EXPORT_TAGS{'all'} } );
 #our @EXPORT      = qw(error new not_before not_after serial);
-our $VERSION     = '0.51';
+our $VERSION     = '0.52';
 my $parser = undef;
 my $asn    = undef;
 my $error  = undef;
-my %oid2enchash = (
+our %oid2enchash = (
                     '1.2.840.113549.1.1.1'  => { 'enc' => 'RSA' },
                     '1.2.840.113549.1.1.2'  => { 'enc' => 'RSA', 'hash' => 'MD2' },
                     '1.2.840.113549.1.1.3'  => { 'enc' => 'RSA', 'hash' => 'MD4' },
@@ -24,11 +24,15 @@ my %oid2enchash = (
                     '1.2.840.113549.1.1.13' => { 'enc' => 'RSA', 'hash' => 'SHA512' },
                     '1.2.840.113549.1.1.14' => { 'enc' => 'RSA', 'hash' => 'SHA224' }
 );
-my %oid2attr = (
+
+our %oid2attr = (
                  "2.5.4.3"                    => "CN",
+                 "2.5.4.4"                    => "SN",
+                 "2.5.4.42"                   => "GN",
+                 "2.5.4.5"                    => "serialNumber",
                  "2.5.4.6"                    => "C",
-                 "2.5.4.7"                    => "l",
-                 "2.5.4.8"                    => "S",
+                 "2.5.4.7"                    => "L",
+                 "2.5.4.8"                    => "ST",
                  "2.5.4.10"                   => "O",
                  "2.5.4.11"                   => "OU",
                  "1.2.840.113549.1.9.1"       => "E",
@@ -690,7 +694,7 @@ If the extension is marked critical, this is also reported.
   Example Output: ExtKeyUsage extension of this Certificates is: critical, serverAuth
 
 =cut back
-my %oid2extkeyusage = (
+our %oid2extkeyusage = (
                         '1.3.6.1.5.5.7.3.1' => 'serverAuth',
                         '1.3.6.1.5.5.7.3.2' => 'clientAuth',
                         '1.3.6.1.5.5.7.3.3' => 'codeSigning',
@@ -1651,6 +1655,7 @@ Convert::ASN1 in 2002 by Norbert Klasen.
 Mike Jackson <mj@sci.fi>,
 Alexander Jung <alexander.w.jung@gmail.com>,
 Duncan Segrest <duncan@gigageek.info>
+Oliver Welter  <owelter@whiterabbitsecurity.com>
 
 =head1 COPYRIGHT
 
