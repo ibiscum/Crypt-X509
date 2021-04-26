@@ -8,7 +8,7 @@ our @ISA         = qw(Exporter);
 our %EXPORT_TAGS = ( 'all' => [qw()] );
 our @EXPORT_OK   = ( @{ $EXPORT_TAGS{'all'} } );
 #our @EXPORT      = qw(error new not_before not_after serial);
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 my $parser = undef;
 my $asn    = undef;
 my $error  = undef;
