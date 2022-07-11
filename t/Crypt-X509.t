@@ -1,5 +1,5 @@
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl Crypt-X509.t'
+# Before 'make install' is performed this script should be runnable with
+# 'make test'. After 'make install' it should work as 'perl Crypt-X509.t'
 use Test::More tests => 71;
 use Math::BigInt;
 BEGIN { use_ok('Crypt::X509') }
