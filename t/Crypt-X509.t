@@ -1,17 +1,23 @@
 # Before 'make install' is performed this script should be runnable with
 # 'make test'. After 'make install' it should work as 'perl Crypt-X509.t'
+use strict;
+use warnings;
 use Test::More tests => 71;
 use Math::BigInt;
 BEGIN { use_ok('Crypt::X509') }
 
-$cert = loadcert('t/verisign.der');
-is( length $cert, 774, 'certificate file loaded' );
-$decoded = Crypt::X509->new( cert => $cert );
-ok( defined $decoded,             'new() returned something' );
-ok( $decoded->isa('Crypt::X509'), 'and it\'s the right class' );
-is( $decoded->error,     undef,      'decode successful' );
-is( $decoded->not_after, 1848787199, 'not_after got parsed' );
-is( join( ',', @{ $decoded->Issuer } ), join( ',', @{ $decoded->Subject } ), 'Root CA: Subject equals Issuer' );
+{
+	my $cert = loadcert('t/verisign.der');
+	is(length $cert, 774, 'certificate file loaded');
+
+	my $decoded = Crypt::X509->new(cert => $cert);
+	ok(defined $decoded, 'new() returned something');
+	ok($decoded->isa('Crypt::X509'), 'and it is the right class');
+
+	is($decoded->error, undef, 'decode successful');
+	is($decoded->not_after, 1848787199, 'not_after got parsed');
+	is(join(',', @{ $decoded->Issuer } ), join(',', @{ $decoded->Subject }), 'Root CA: Subject equals Issuer');
+}
 
 $cert = loadcert('t/aj.cer');
 $decoded2 = Crypt::X509->new( cert => $cert );
