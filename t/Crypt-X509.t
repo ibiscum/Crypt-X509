@@ -2,7 +2,7 @@
 # 'make test'. After 'make install' it should work as 'perl Crypt-X509.t'
 use strict;
 use warnings;
-use Test::More tests => 78;
+use Test::More tests => 83;
 use Math::BigInt;
 BEGIN { use_ok('Crypt::X509') }
 
@@ -157,39 +157,69 @@ BEGIN { use_ok('Crypt::X509') }
 }
 
 {
-	my $cert = loadcert('t/4096b-dsa-example-cert.der');
+	my $cert = loadcert('t/4096b-dsa-example-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 4096b-dsa-example-cert.der successful' );
+	is( $decoded->error, undef, 'decode of 4096b-dsa-example-cert.crt successful' );
 }
 
 {
-	my $cert = loadcert('t/4096b-dsa-example-cert.der');
+	my $cert = loadcert('t/4096b-rsa-example-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 4096b-dsa-example-cert.der successful' );
+	is( $decoded->error, undef, 'decode of 4096b-rsa-example-cert.crt successful' );
 }
 
 {
-	my $cert = loadcert('t/4096b-rsa-example-cert.der');
+	my $cert = loadcert('t/570-ec-sect571r1-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 4096b-rsa-example-cert.der successful' );
+	is( $decoded->error, undef, 'decode of 570-ec-sect571r1-cert.crt successful' );
 }
 
 {
-	my $cert = loadcert('t/570-ec-sect571r1-cert.der');
+	my $cert = loadcert('t/9999-years-rsa-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 570-ec-sect571r1-cert.der successful' );
+	is( $decoded->error, undef, 'decode of 9999-years-rsa-cert.crt successful' );
 }
 
 {
-	my $cert = loadcert('t/9999-years-rsa-cert.der');
+	my $cert = loadcert('t/999b-rsa-example-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 9999-years-rsa-cert.der successful' );
+	is( $decoded->error, undef, 'decode of 999b-rsa-example-cert.crt successful' );
 }
 
 {
-	my $cert = loadcert('t/999b-rsa-example-cert.der');
+	my $cert = loadcert('t/embedded-html-cert.crt');
 	my $decoded = Crypt::X509->new( cert => $cert );
-	is( $decoded->error, undef, 'decode of 999b-rsa-example-cert.der successful' );
+	is( $decoded->error, undef, 'decode of embedded-html-cert.crt successful' );
+}
+
+{
+	my $cert = loadcert('t/example_ed25519.com.crt');
+	my $decoded = Crypt::X509->new( cert => $cert );
+	is( $decoded->error, undef, 'decode of example_ed25519.com.crt successful' );
+}
+
+{
+	my $cert = loadcert('t/frank4dd-cacert.crt');
+	my $decoded = Crypt::X509->new( cert => $cert );
+	is( $decoded->error, undef, 'decode of frank4dd-cacert.crt successful' );
+}
+
+{
+	my $cert = loadcert('t/google_jp_458san.crt');
+	my $decoded = Crypt::X509->new( cert => $cert );
+	is( $decoded->error, undef, 'decode of google_jp_458san.crt successful' );
+}
+
+{
+	my $cert = loadcert('t/napoleon-cert.crt');
+	my $decoded = Crypt::X509->new( cert => $cert );
+	is( $decoded->error, undef, 'decode of napoleon-cert.crt successful' );
+}
+
+{
+	my $cert = loadcert('t/valid-1901-example-cert.crt');
+	my $decoded = Crypt::X509->new( cert => $cert );
+	is( $decoded->error, undef, 'decode of valid-1901-example-cert.crt successful' );
 }
 
 exit();
